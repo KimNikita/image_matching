@@ -42,7 +42,7 @@ def by_image(self, image, accuracy=0.95, second_try=False, similarity=4):
     if max_value >= accuracy:
         # DEBUG
         cv.rectangle(screenshot, max_location,
-                     (max_location[0] + w, max_location[1] + h), (0, 255, 0), 3)
+                     (max_location[0] + w, max_location[1] + h), (0, 0, 255), 3)
 
         # control_wrapper = pywinauto.Desktop(backend=self.backend.name).from_point(x, y)
         # if 'top_level_only' not in control_wrapper:
