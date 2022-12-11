@@ -19,8 +19,9 @@ def by_image(self, image, accuracy=0.95, second_try=False, similarity=4):
     # screenshot = cv.cvtColor(img_cv, cv.COLOR_BGR2GRAY)
 
     # DEBUG
-    import pyautogui
-    screenshot = pyautogui.screenshot()
+    from PIL import ImageGrab
+
+    screenshot = ImageGrab.grab(None)
     screenshot.save(r'C:/Users/Никита/Desktop/screen.png')
     screenshot = cv.imread('screen.png', 0)
 
