@@ -25,7 +25,7 @@ def by_image(self, image, accuracy=0.95, second_try=False, similarity=4):
 
     screenshot = ImageGrab.grab(None)
     screenshot.save('screen.png')
-    screenshot = cv.imread('screen.png', 0)
+    screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
 
     if isinstance(image, str):
         template = cv.imread(image, cv.IMREAD_GRAYSCALE)
@@ -131,7 +131,7 @@ def locate_one(image, accuracy=0.95, second_try=False, similarity=4):
 
     screenshot = ImageGrab.grab(None)
     screenshot.save('screen.png')
-    screenshot = cv.imread('screen.png', 0)
+    screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
 
     if isinstance(image, str):
         template = cv.imread(image, cv.IMREAD_GRAYSCALE)
@@ -149,6 +149,7 @@ def locate_one(image, accuracy=0.95, second_try=False, similarity=4):
 
     a, max_value, b, max_location = cv.minMaxLoc(res)
     w, h = template.shape[::-1]
+    box = (0,0,0,0)
 
     # DEBUG
     x = max_location[0] + w//2
@@ -188,12 +189,8 @@ def locate_one(image, accuracy=0.95, second_try=False, similarity=4):
                          (max_location[0] + w, max_location[1] + h), (0, 0, 255), 3)
 
     # DEBUG
-    from matplotlib import pyplot as plt
-    plt.subplot(121), plt.imshow(res, cmap='gray')
-    plt.title('Matching Result'), plt.xticks([]), plt.yticks([])
-    plt.subplot(122), plt.imshow(screenshot)
-    plt.title('Detected Point'), plt.xticks([]), plt.yticks([])
-    plt.show()
+    cv.imshow("Result", screenshot)
+    cv.waitKey(0)
 
     return box
 
@@ -217,7 +214,7 @@ def locate_all(image, count, accuracy=0.95, second_try=False, similarity=4):
 
     screenshot = ImageGrab.grab(None)
     screenshot.save('screen.png')
-    screenshot = cv.imread('screen.png', 0)
+    screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
 
     if isinstance(image, str):
         template = cv.imread(image, cv.IMREAD_GRAYSCALE)
@@ -275,20 +272,55 @@ def locate_all(image, count, accuracy=0.95, second_try=False, similarity=4):
     for box in boxes:
         cv.rectangle(screenshot, (box[0]+5, box[1]+5),
                      (box[2]-5, box[3]-5), (255, 255, 255), 3)
-    from matplotlib import pyplot as plt
-    plt.subplot(121), plt.imshow(res, cmap='gray')
-    plt.title('Matching Result'), plt.xticks([]), plt.yticks([])
-    plt.subplot(122), plt.imshow(screenshot)
-    plt.title('Detected Point'), plt.xticks([]), plt.yticks([])
-    plt.show()
+    cv.imshow("Result", screenshot)
+    cv.waitKey(0)
 
     return boxes
 
+def scale_locate_one(template):
+    # import the necessary packages
+    import numpy as np
+    import imutils
+    import cv2 as cv
+    from PIL import ImageGrab
+    screenshot = ImageGrab.grab(None)
+    screenshot.save('screen.png')
+    screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
+    template = cv.imread(template)
+    template = cv.cvtColor(template, cv.COLOR_BGR2GRAY)
+    (tH, tW) = template.shape[:2]
+    found = None
+    # loop over the scales of the image
+    for scale in np.linspace(0.2, 1.0, 20)[::-1]:
+        # resize the image according to the scale, and keep track
+        # of the ratio of the resizing
+        resized = imutils.resize(screenshot, width = int(screenshot.shape[1] * scale))
+        r = screenshot.shape[1] / float(resized.shape[1])
+        # if the resized image is smaller than the template, then break
+        # from the loop
+        if resized.shape[0] < tH or resized.shape[1] < tW:
+            break
+        
+        result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
+        (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
+        # if we have found a new maximum correlation value, then update
+        # the bookkeeping variable
+        if found is None or maxVal > found[0]:
+            found = (maxVal, maxLoc, r)
+    (maxVal, maxLoc, r) = found
+    (startX, startY) = (int(maxLoc[0] * r), int(maxLoc[1] * r))
+    (endX, endY) = (int((maxLoc[0] + tW) * r), int((maxLoc[1] + tH) * r))
+    # draw a bounding box around the detected result and display the image
+    cv.rectangle(screenshot, (startX, startY), (endX, endY), (0, 0, 255), 2)
+    cv.imshow("Result", screenshot)
+    cv.waitKey(0)
+    return ((maxVal),  (startX, startY, endX, endY))
 
 def main():
     # by_image(None, 'original.png', second_try=True)
-    # result = locate_one('original.png', second_try=True)
-    result = locate_all('original.png', 10, second_try=True)
+    result = locate_one('original.png', second_try=True)
+    # result = locate_all('original.png', 10, second_try=True)
+    # result = scale_locate_one('original.png')
     print(result)
 
 
