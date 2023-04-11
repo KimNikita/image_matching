@@ -1,6 +1,6 @@
 # TODO fix save path for screenshot
 
-
+# FINAL FUNCTION
 def by_image(self, image, accuracy=0.95, second_try=False, similarity=4):
     '''
     image - path to original image of control.\n
@@ -112,6 +112,8 @@ def by_image(self, image, accuracy=0.95, second_try=False, similarity=4):
     plt.title('Detected Point'), plt.xticks([]), plt.yticks([])
     plt.show()
 
+# MY TEMPLATE MATCHING
+
 
 def locate_one(image, accuracy=0.95, second_try=False, similarity=4):
     '''
@@ -149,7 +151,7 @@ def locate_one(image, accuracy=0.95, second_try=False, similarity=4):
 
     a, max_value, b, max_location = cv.minMaxLoc(res)
     w, h = template.shape[::-1]
-    box = (0,0,0,0)
+    box = (0, 0, 0, 0)
 
     # DEBUG
     x = max_location[0] + w//2
@@ -277,6 +279,9 @@ def locate_all(image, count, accuracy=0.95, second_try=False, similarity=4):
 
     return boxes
 
+# MULTI SCALE TEMPLATE MATCHING
+
+
 def scale_locate_one(template):
     # import the necessary packages
     import numpy as np
@@ -294,13 +299,14 @@ def scale_locate_one(template):
     for scale in np.linspace(0.2, 1.0, 20)[::-1]:
         # resize the image according to the scale, and keep track
         # of the ratio of the resizing
-        resized = imutils.resize(screenshot, width = int(screenshot.shape[1] * scale))
+        resized = imutils.resize(
+            screenshot, width=int(screenshot.shape[1] * scale))
         r = screenshot.shape[1] / float(resized.shape[1])
         # if the resized image is smaller than the template, then break
         # from the loop
         if resized.shape[0] < tH or resized.shape[1] < tW:
             break
-        
+
         result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
         (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
         # if we have found a new maximum correlation value, then update
@@ -316,11 +322,19 @@ def scale_locate_one(template):
     cv.waitKey(0)
     return ((maxVal),  (startX, startY, endX, endY))
 
+# KEYPOINT MATCHING
+
+
+def keypoint_locate_one(template):
+    pass
+
+
 def main():
     # by_image(None, 'original.png', second_try=True)
-    result = locate_one('original.png', second_try=True)
     # result = locate_all('original.png', 10, second_try=True)
+    result = locate_one('original.png', second_try=True)
     # result = scale_locate_one('original.png')
+    # result = keypoint_locate_one('original.png')
     print(result)
 
 
