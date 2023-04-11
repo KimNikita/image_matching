@@ -45,7 +45,7 @@ def by_image(self, image, accuracy=0.95, second_try=False, similarity=4):
     if max_value >= accuracy:
         # DEBUG
         cv.rectangle(screenshot, max_location,
-                     (max_location[0] + w, max_location[1] + h), (0, 0, 255), 3)
+                     (max_location[0] + w, max_location[1] + h), (0, 0, 255), 2)
 
         # control_wrapper = pywinauto.Desktop(backend=self.backend.name).from_point(x, y)
         # if 'top_level_only' not in control_wrapper:
@@ -89,7 +89,7 @@ def by_image(self, image, accuracy=0.95, second_try=False, similarity=4):
 
             # DEBUG
             cv.rectangle(screenshot, max_location,
-                         (max_location[0] + w, max_location[1] + h), (0, 0, 255), 3)
+                         (max_location[0] + w, max_location[1] + h), (0, 0, 255), 2)
 
             # control_wrapper = pywinauto.Desktop(backend=self.backend.name).from_point(x, y)
 
@@ -164,7 +164,7 @@ def locate_one(image, accuracy=0.95, second_try=False, similarity=4):
 
         # DEBUG
         cv.rectangle(screenshot, max_location,
-                     (max_location[0] + w, max_location[1] + h), (0, 0, 255), 3)
+                     (max_location[0] + w, max_location[1] + h), (0, 0, 255), 2)
 
     elif second_try:
         # Getting each value in format 0.00
@@ -188,7 +188,7 @@ def locate_one(image, accuracy=0.95, second_try=False, similarity=4):
 
             # DEBUG
             cv.rectangle(screenshot, max_location,
-                         (max_location[0] + w, max_location[1] + h), (0, 0, 255), 3)
+                         (max_location[0] + w, max_location[1] + h), (0, 0, 255), 2)
 
     # DEBUG
     cv.imshow("Result", screenshot)
@@ -273,7 +273,7 @@ def locate_all(image, count, accuracy=0.95, second_try=False, similarity=4):
     # DEBUG
     for box in boxes:
         cv.rectangle(screenshot, (box[0]+5, box[1]+5),
-                     (box[2]-5, box[3]-5), (255, 255, 255), 3)
+                     (box[2]-5, box[3]-5), (255, 255, 255), 2)
     cv.imshow("Result", screenshot)
     cv.waitKey(0)
 
@@ -288,11 +288,14 @@ def scale_locate_one(template):
     import imutils
     import cv2 as cv
     from PIL import ImageGrab
+
     screenshot = ImageGrab.grab(None)
     screenshot.save('screen.png')
     screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
+
     template = cv.imread(template)
     template = cv.cvtColor(template, cv.COLOR_BGR2GRAY)
+
     (tH, tW) = template.shape[:2]
     found = None
     # loop over the scales of the image
@@ -316,25 +319,104 @@ def scale_locate_one(template):
     (maxVal, maxLoc, r) = found
     (startX, startY) = (int(maxLoc[0] * r), int(maxLoc[1] * r))
     (endX, endY) = (int((maxLoc[0] + tW) * r), int((maxLoc[1] + tH) * r))
-    # draw a bounding box around the detected result and display the image
+
+    # DEBUG
     cv.rectangle(screenshot, (startX, startY), (endX, endY), (0, 0, 255), 2)
     cv.imshow("Result", screenshot)
     cv.waitKey(0)
+
     return ((maxVal),  (startX, startY, endX, endY))
 
 # KEYPOINT MATCHING
 
 
-def keypoint_locate_one(template):
-    pass
+def keypoint_locate_one(template, custom_accuracy=False, accuracy=0.95):
+    import numpy as np
+    import cv2 as cv
+    from PIL import ImageGrab
+
+    screenshot = ImageGrab.grab(None)
+    screenshot.save('screen.png')
+    screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
+
+    if isinstance(template, str):
+        template = cv.imread(template, cv.IMREAD_GRAYSCALE)
+        if template is None:
+            print('cannot read image')
+    else:
+        print('invalid format of image')
+
+    w, h = template.shape[::-1]
+
+    # Initiate SIFT detector
+    sift = cv.SIFT_create()
+
+    # find the keypoints and descriptors with SIFT
+    kp1, des1 = sift.detectAndCompute(template, None)
+    kp2, des2 = sift.detectAndCompute(screenshot, None)
+
+    # BFMatcher
+    best_matches = []
+    if not custom_accuracy:
+        bf = cv.BFMatcher(cv.NORM_L2, crossCheck=True)
+        matches = bf.match(des1, des2)
+        best_matches = sorted(matches, key=lambda x: x.distance)
+    else:
+        bf = cv.BFMatcher(cv.NORM_L2, crossCheck=False)
+        matches = bf.knnMatch(des1, des2, k=2)
+        good = []
+        for m, n in matches:
+            if m.distance < accuracy*n.distance:
+                best_matches.append(m)
+                good.append([m])
+
+        # DEBUG
+        # cv.drawMatchesKnn expects list of lists as matches.
+        import matplotlib.pyplot as plt
+        img3 = cv.drawMatchesKnn(template, kp1, screenshot, kp2, good,
+                                 None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        plt.imshow(img3), plt.show()
+
+    # Initialize lists
+    list_x = []
+    list_y = []
+
+    # For each match...
+    for mat in best_matches:
+        # Get the matching keypoints for screenshot
+        screenshot_idx = mat.trainIdx
+
+        # x - columns
+        # y - rows
+        # Get the coordinates
+        (x, y) = kp2[screenshot_idx].pt
+
+        # Append to each list
+        list_x.append(x)
+        list_y.append(y)
+
+    if len(list_x) > 0 and len(list_y) > 0:
+        max_location = (np.mean(list_x), np.mean(list_y))
+        box = (max_location[0] - w/2, max_location[1] - h/2,
+               max_location[0] + w/2, max_location[1] + h/2)
+
+        # DEBUG
+        cv.rectangle(screenshot, (box[0], box[1]),
+                     (box[2], box[3]), (0, 0, 255), 2)
+        cv.imshow("Result", screenshot)
+        cv.waitKey(0)
+
+        return box
+
+    return (0, 0, 0, 0)
 
 
 def main():
     # by_image(None, 'original.png', second_try=True)
     # result = locate_all('original.png', 10, second_try=True)
-    result = locate_one('original.png', second_try=True)
+    # result = locate_one('original.png', second_try=True)
     # result = scale_locate_one('original.png')
-    # result = keypoint_locate_one('original.png')
+    result = keypoint_locate_one('original.png')
     print(result)
 
 
