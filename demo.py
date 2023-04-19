@@ -1,15 +1,15 @@
 # TODO fix save path for screenshot
 
 # FINAL FUNCTION
-def by_image(self, image, accuracy=0.95, second_try=False, similarity=4):
+def by_image(self, template, accuracy=0.95, second_try=False, similarity=4):
     '''
-    image - path to original image of control.\n
-    accuracy - the percentage of pixels matching the original image and the one found on the screen. Default 0.95.\n
+    template - path to template image of control.\n
+    accuracy - the percentage of pixels matching the template image and the one found on the screen. Default 0.95.\n
     second_try - indicates whether to use a different search method based on the similarity score.
-    Useful when the size of original image has been changed. Default False.\n
-    similarity - an integer on a five-point scale, sets the minimum similarity of the original image and the one found on the screen.
+    Useful when the size of template image has been changed. Default False.\n
+    similarity - an integer on a five-point scale, sets the minimum similarity of the template image and the one found on the screen.
     Used with second_try=True. Default 4.\n
-    Second search method works better in cases when the size of the original image has been increased.
+    Second search method works better in cases when the size of the template image has been increased.
     '''
     import cv2 as cv
     import numpy as np
@@ -27,12 +27,14 @@ def by_image(self, image, accuracy=0.95, second_try=False, similarity=4):
     screenshot.save('screen.png')
     screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
 
-    if isinstance(image, str):
-        template = cv.imread(image, cv.IMREAD_GRAYSCALE)
+    if isinstance(template, str):
+        template = cv.imread(template, cv.IMREAD_GRAYSCALE)
         if template is None:
-            print('cannot read image')
+            print('Cannot read image, check cv2.imread() documentation')
+            return None
     else:
-        print('invalid format of image')
+        print('Invalid format of image')
+        return None
 
     # Apply template Matching
     res = cv.matchTemplate(screenshot, template, cv.TM_CCOEFF_NORMED)
@@ -115,17 +117,17 @@ def by_image(self, image, accuracy=0.95, second_try=False, similarity=4):
 # MY TEMPLATE MATCHING
 
 
-def locate_one(image, accuracy=0.95, second_try=False, similarity=4):
+def locate_one(template, accuracy=0.95, second_try=False, similarity=4):
     '''
-    image - path to original image of control.\n
-    accuracy - the percentage of pixels matching the original image and the one found on the screen. Default 0.95.\n
+    template - path to template image of control.\n
+    accuracy - the percentage of pixels matching the template image and the one found on the screen. Default 0.95.\n
     second_try - indicates whether to use a different search method based on the similarity score.
-    Useful when the size of original image has been changed. Default False.\n
-    similarity - an integer on a five-point scale, sets the minimum similarity of the original image and the one found on the screen.
+    Useful when the size of template image has been changed. Default False.\n
+    similarity - an integer on a five-point scale, sets the minimum similarity of the template image and the one found on the screen.
     Used with second_try=True. Default 4.\n
-    Second search method works better in cases when the size of the original image has been increased.
+    Second search method works better in cases when the size of the template image has been increased.
     Function returns rectangle coordinates (upper_left_x, upper_left_y, lower_right_x, lower_right_y) of found control.
-    Size of rectangle are equal to original image size.
+    Size of rectangle are equal to template image size.
     '''
     import cv2 as cv
     import numpy as np
@@ -135,12 +137,14 @@ def locate_one(image, accuracy=0.95, second_try=False, similarity=4):
     screenshot.save('screen.png')
     screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
 
-    if isinstance(image, str):
-        template = cv.imread(image, cv.IMREAD_GRAYSCALE)
+    if isinstance(template, str):
+        template = cv.imread(template, cv.IMREAD_GRAYSCALE)
         if template is None:
-            print('cannot read image')
+            print('Cannot read image, check cv2.imread() documentation')
+            return None
     else:
-        print('invalid format of image')
+        print('Invalid format of image')
+        return None
 
     # Apply template Matching
     res = cv.matchTemplate(screenshot, template, cv.TM_CCOEFF_NORMED)
@@ -149,7 +153,7 @@ def locate_one(image, accuracy=0.95, second_try=False, similarity=4):
         similarity = 1
     similarity = similarity/100-0.001
 
-    a, max_value, b, max_location = cv.minMaxLoc(res)
+    _, max_value, _, max_location = cv.minMaxLoc(res)
     w, h = template.shape[::-1]
     box = (0, 0, 0, 0)
 
@@ -197,18 +201,18 @@ def locate_one(image, accuracy=0.95, second_try=False, similarity=4):
     return box
 
 
-def locate_all(image, count, accuracy=0.95, second_try=False, similarity=4):
+def locate_all(template, count, accuracy=0.95, second_try=False, similarity=4):
     '''
-    image - path to original image of control.\n
+    template - path to template image of control.\n
     count - expected number of controls to be found.\n
-    accuracy - the percentage of pixels matching the original image and the one found on the screen. Default 0.95.\n
+    accuracy - the percentage of pixels matching the template image and the one found on the screen. Default 0.95.\n
     second_try - indicates whether to use a different search method based on the similarity score.
-    Useful when the size of original image has been changed. Default False.\n
-    similarity - an integer on a five-point scale, sets the minimum similarity of the original image and the one found on the screen.
+    Useful when the size of template image has been changed. Default False.\n
+    similarity - an integer on a five-point scale, sets the minimum similarity of the template image and the one found on the screen.
     Used with second_try=True. Default 4.\n
-    Second search method works better in cases when the size of the original image has been increased.
+    Second search method works better in cases when the size of the template image has been increased.
     Function returns a list of rectangle coordinates (upper_left_x, upper_left_y, lower_right_x, lower_right_y) of found controls.
-    Sizes of rectangles are equals to original image size.
+    Sizes of rectangles are equals to template image size.
     '''
     import cv2 as cv
     import numpy as np
@@ -218,12 +222,14 @@ def locate_all(image, count, accuracy=0.95, second_try=False, similarity=4):
     screenshot.save('screen.png')
     screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
 
-    if isinstance(image, str):
-        template = cv.imread(image, cv.IMREAD_GRAYSCALE)
+    if isinstance(template, str):
+        template = cv.imread(template, cv.IMREAD_GRAYSCALE)
         if template is None:
-            print('cannot read image')
+            print('Cannot read image, check cv2.imread() documentation')
+            return None
     else:
-        print('invalid format of image')
+        print('Invalid format of image')
+        return
 
     if similarity <= 0:
         similarity = 1
@@ -235,7 +241,7 @@ def locate_all(image, count, accuracy=0.95, second_try=False, similarity=4):
     for i in range(0, count):
         # Apply template Matching
         res = cv.matchTemplate(screenshot, template, cv.TM_CCOEFF_NORMED)
-        a, max_value, b, max_location = cv.minMaxLoc(res)
+        _, max_value, _, max_location = cv.minMaxLoc(res)
 
         # DEBUG
         x = max_location[0] + w//2
@@ -293,11 +299,17 @@ def scale_locate_one(template):
     screenshot.save('screen.png')
     screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
 
-    template = cv.imread(template)
-    template = cv.cvtColor(template, cv.COLOR_BGR2GRAY)
+    if isinstance(template, str):
+        template = cv.imread(template, cv.IMREAD_GRAYSCALE)
+        if template is None:
+            print('Cannot read image, check cv2.imread() documentation')
+            return None
+    else:
+        print('Invalid format of image')
+        return None
 
-    (tH, tW) = template.shape[:2]
-    found = None
+    (h, w) = template.shape[:2]
+    found = (0, 0, 0)
     # loop over the scales of the image
     for scale in np.linspace(0.2, 1.0, 20)[::-1]:
         # resize the image according to the scale, and keep track
@@ -307,30 +319,31 @@ def scale_locate_one(template):
         r = screenshot.shape[1] / float(resized.shape[1])
         # if the resized image is smaller than the template, then break
         # from the loop
-        if resized.shape[0] < tH or resized.shape[1] < tW:
+        if resized.shape[0] < h or resized.shape[1] < w:
             break
 
         result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
         (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
         # if we have found a new maximum correlation value, then update
         # the bookkeeping variable
-        if found is None or maxVal > found[0]:
+        if maxVal > found[0]:
             found = (maxVal, maxLoc, r)
     (maxVal, maxLoc, r) = found
     (startX, startY) = (int(maxLoc[0] * r), int(maxLoc[1] * r))
-    (endX, endY) = (int((maxLoc[0] + tW) * r), int((maxLoc[1] + tH) * r))
+    (endX, endY) = (int((maxLoc[0] + w) * r), int((maxLoc[1] + h) * r))
 
     # DEBUG
+    print(maxVal)
     cv.rectangle(screenshot, (startX, startY), (endX, endY), (0, 0, 255), 2)
     cv.imshow("Result", screenshot)
     cv.waitKey(0)
 
-    return ((maxVal),  (startX, startY, endX, endY))
+    return (startX, startY, endX, endY)
 
 # KEYPOINT MATCHING
 
 
-def keypoint_locate_one(template, custom_accuracy=False, accuracy=0.95):
+def keypoint_locate_one(template, accuracy=0.95):
     import numpy as np
     import cv2 as cv
     from PIL import ImageGrab
@@ -342,9 +355,11 @@ def keypoint_locate_one(template, custom_accuracy=False, accuracy=0.95):
     if isinstance(template, str):
         template = cv.imread(template, cv.IMREAD_GRAYSCALE)
         if template is None:
-            print('cannot read image')
+            print('Cannot read image, check cv2.imread() documentation')
+            return None
     else:
-        print('invalid format of image')
+        print('Invalid format of image')
+        return None
 
     w, h = template.shape[::-1]
 
@@ -357,29 +372,34 @@ def keypoint_locate_one(template, custom_accuracy=False, accuracy=0.95):
 
     # BFMatcher
     best_matches = []
-    if not custom_accuracy:
-        bf = cv.BFMatcher(cv.NORM_L2, crossCheck=True)
-        matches = bf.match(des1, des2)
-        best_matches = sorted(matches, key=lambda x: x.distance)
-    else:
-        bf = cv.BFMatcher(cv.NORM_L2, crossCheck=False)
-        matches = bf.knnMatch(des1, des2, k=2)
-        good = []
-        for m, n in matches:
-            if m.distance < accuracy*n.distance:
-                best_matches.append(m)
-                good.append([m])
 
-        # DEBUG
-        # cv.drawMatchesKnn expects list of lists as matches.
-        import matplotlib.pyplot as plt
-        img3 = cv.drawMatchesKnn(template, kp1, screenshot, kp2, good,
-                                 None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-        plt.imshow(img3), plt.show()
+    bf = cv.BFMatcher(cv.NORM_L2, crossCheck=False)
+    matches = bf.knnMatch(des1, des2, k=2)
+    # DEBUG
+    good = []
+    '''
+    Short version: each keypoint of the first image is matched with a number of keypoints from the second image.
+    We keep the 2 best matches for each keypoint (best matches = the ones with the smallest distance measurement).
+    Lowe's test checks that the two distances are sufficiently different.
+    If they are not, then the keypoint is eliminated and will not be used for further calculations.
+    https://docs.opencv.org/3.4/d5/d6f/tutorial_feature_flann_matcher.html#:~:text=To%20filter%20the%20matches%2C%20Lowe,value%20is%20below%20a%20threshold.
+    '''
+    for m, n in matches:
+        if m.distance < (0.7 + (1-accuracy)*0.3)*n.distance:
+            best_matches.append(m)
+            # DEBUG
+            good.append([m])
+    # DEBUG
+    # cv.drawMatchesKnn expects list of lists as matches.
+    import matplotlib.pyplot as plt
+    img3 = cv.drawMatchesKnn(template, kp1, screenshot, kp2, good,
+                             None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    plt.imshow(img3), plt.show()
 
     # Initialize lists
     list_x = []
     list_y = []
+    box = (0, 0, 0, 0)
 
     # For each match...
     for mat in best_matches:
@@ -395,10 +415,15 @@ def keypoint_locate_one(template, custom_accuracy=False, accuracy=0.95):
         list_x.append(x)
         list_y.append(y)
 
+    # TODO есть trim_mean в scipy
+
+    def slice_mean(freq, percent):
+        return np.mean(freq[round(percent * len(freq)): round(-percent * len(freq))])
+
     if len(list_x) > 0 and len(list_y) > 0:
-        max_location = (np.mean(list_x), np.mean(list_y))
-        box = (max_location[0] - w/2, max_location[1] - h/2,
-               max_location[0] + w/2, max_location[1] + h/2)
+        max_location = (slice_mean(list_x, 0.1), slice_mean(list_y, 0.1))
+        box = (int(max_location[0] - w/2), int(max_location[1] - h/2),
+               int(max_location[0] + w/2), int(max_location[1] + h/2))
 
         # DEBUG
         cv.rectangle(screenshot, (box[0], box[1]),
@@ -406,14 +431,12 @@ def keypoint_locate_one(template, custom_accuracy=False, accuracy=0.95):
         cv.imshow("Result", screenshot)
         cv.waitKey(0)
 
-        return box
-
-    return (0, 0, 0, 0)
+    return box
 
 
 def main():
     # by_image(None, 'original.png', second_try=True)
-    # result = locate_all('original.png', 10, second_try=True)
+    # result = locate_all('original.png', 5, second_try=True)
     # result = locate_one('original.png', second_try=True)
     # result = scale_locate_one('original.png')
     result = keypoint_locate_one('original.png')
