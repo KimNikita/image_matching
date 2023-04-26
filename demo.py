@@ -422,8 +422,8 @@ def keypoint_locate_one(template, accuracy=0.95):
 
     if len(list_x) > 0 and len(list_y) > 0:
         max_location = (slice_mean(list_x, 0.1), slice_mean(list_y, 0.1))
-        box = (int(max_location[0] - w/2), int(max_location[1] - h/2),
-               int(max_location[0] + w/2), int(max_location[1] + h/2))
+        box = (max_location[0] - w//2, max_location[1] - h//2,
+               max_location[0] + w//2, max_location[1] + h//2)
 
         # DEBUG
         cv.rectangle(screenshot, (box[0], box[1]),
