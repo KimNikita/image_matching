@@ -305,10 +305,77 @@ def main():
                 times[i][scale_type].append(np.mean(times))
                 results[i][scale_type].append(np.mean(p_res))
 
-    # TODO compare results, may be write to excel
+    # TODO check results write to excel
     print(accuracy_results)
     print(time_results)
 
+    import xlsxwriter
+
+    workbook = xlsxwriter.Workbook('results.xlsx')
+    worksheet = workbook.add_worksheet()
+
+    # increase table
+    worksheet.write(0, 0, '"%" increase')
+    worksheet.write(0, 1, 'my_template_matching')
+    worksheet.write(0, 2, 'multi-scale_template_matching')
+    worksheet.write(0, 3, 'keypoint_matching')
+    worksheet.write(0, 4, 'times')
+    worksheet.write(0, 5, 'my_template_matching')
+    worksheet.write(0, 6, 'multi-scale_template_matching')
+    worksheet.write(0, 7, 'keypoint_matching')
+    
+    row = 0
+    for percent in np.linspace(0.05, 0.5, 10):
+        p = int(percent*100)
+        row+=1
+        worksheet.write(row, 0, p)
+        for col, alg in enumerate(accuracy_results):
+            worksheet.write(row, col+1, alg[0][row-1])
+        for col, alg in enumerate(time_results):
+            worksheet.write(row, col+5, alg[0][row-1])
+
+    # decrease table
+    worksheet.write(11, 0, '"%" decrease')
+    worksheet.write(11, 1, 'my_template_matching')
+    worksheet.write(11, 2, 'multi-scale_template_matching')
+    worksheet.write(11, 3, 'keypoint_matching')
+    worksheet.write(11, 4, 'times')
+    worksheet.write(11, 5, 'my_template_matching')
+    worksheet.write(11, 6, 'multi-scale_template_matching')
+    worksheet.write(11, 7, 'keypoint_matching')
+
+    row = 11
+    for percent in np.linspace(0.05, 0.5, 10):
+        p = int(percent*100)
+        row+=1
+        worksheet.write(row, 0, p)
+        for col, alg in enumerate(accuracy_results):
+            worksheet.write(row, col+1, alg[1][row-1])
+        for col, alg in enumerate(time_results):
+            worksheet.write(row, col+5, alg[1][row-1])
+
+    # incdec table
+    worksheet.write(22, 0, '"%" incdec')
+    worksheet.write(22, 1, 'my_template_matching')
+    worksheet.write(22, 2, 'multi-scale_template_matching')
+    worksheet.write(22, 3, 'keypoint_matching')
+    worksheet.write(22, 4, 'times')
+    worksheet.write(22, 5, 'my_template_matching')
+    worksheet.write(22, 6, 'multi-scale_template_matching')
+    worksheet.write(22, 7, 'keypoint_matching')
+
+    row = 22
+    for percent in np.linspace(0.05, 0.5, 10):
+        p = int(percent*100)
+        row+=1
+        worksheet.write(row, 0, p)
+        for col, alg in enumerate(accuracy_results):
+            worksheet.write(row, col+1, alg[2][row-1])
+        for col, alg in enumerate(time_results):
+            worksheet.write(row, col+5, alg[2][row-1])
+
+    
+    workbook.close()
 
 if __name__ == "__main__":
     main()
