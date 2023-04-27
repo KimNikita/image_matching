@@ -356,6 +356,7 @@ def main():
                 # RELEASE
                 time_results[i][scale_type].append(np.mean(times))
                 accuracy_results[i][scale_type].append(np.mean(a_res))
+                point_results[i][scale_type].append(p_res)
 
     # DEBUG
     print(point_results)

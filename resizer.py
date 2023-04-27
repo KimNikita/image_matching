@@ -84,6 +84,7 @@ def prepare_test_data(template):
                 data = screenshot.copy()
                 pos = (s_w//2, s_h//2)
 
+                # TODO may be random pos?
                 x_offset = s_w//2 - r_w//2
                 y_offset = s_h//2 - r_h//2
                 data[y_offset:y_offset+r_h, x_offset:x_offset+r_w] = resized
