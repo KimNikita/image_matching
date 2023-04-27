@@ -3,14 +3,23 @@ import cv2 as cv
 import numpy as np
 from PIL import ImageGrab
 from resizer import prepare_test_data
+import math
 
 # multi scale
 import imutils
 
+def timing(f):
+    def wrapper(template):
+        start_time = timeit.default_timer()
+        result = f(template)
+        ellapsed_time = timeit.default_timer() - start_time
+        return result, ellapsed_time
+    return wrapper
+
 
 # MY TEMPLATE MATCHING
-
-def locate_one(template, accuracy=0.95, second_try=False, similarity=4):
+@timing
+def locate_one(template, accuracy=0.95, second_try=True, similarity=4):
     screenshot = ImageGrab.grab(None)
     screenshot.save('screen.png')
     screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
@@ -59,11 +68,12 @@ def locate_one(template, accuracy=0.95, second_try=False, similarity=4):
             x = max_location[0] + w//2
             y = max_location[1] + h//2
 
-    return x, y
+    return (x, y)
 
 # MULTI SCALE TEMPLATE MATCHING
 
-def scale_locate_one(template):
+@timing
+def scale_locate_one(template, accuracy=0.95):
     screenshot = ImageGrab.grab(None)
     screenshot.save('screen.png')
     screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
@@ -78,32 +88,42 @@ def scale_locate_one(template):
         return None
 
     (h, w) = template.shape[:2]
-    found = (0, 0, 0)
-    # loop over the scales of the image
+    found = (0, (-w//2, -h//2), 1)
+    # decrease
     for scale in np.linspace(0.2, 1.0, 20)[::-1]:
-        # resize the image according to the scale, and keep track
-        # of the ratio of the resizing
         resized = imutils.resize(
             screenshot, width=int(screenshot.shape[1] * scale))
         r = screenshot.shape[1] / float(resized.shape[1])
-        # if the resized image is smaller than the template, then break
-        # from the loop
+
         if resized.shape[0] < h or resized.shape[1] < w:
             break
 
         result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
         (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
-        # if we have found a new maximum correlation value, then update
-        # the bookkeeping variable
-        if maxVal > found[0]:
+
+        if maxVal > found[0] and maxVal >= accuracy:
             found = (maxVal, maxLoc, r)
+
+    # increase
+    for scale in np.linspace(0.2, 1.0, 20):
+        resized = imutils.resize(
+            screenshot, width=int(screenshot.shape[1] * (1+scale)))
+        r = screenshot.shape[1] / float(resized.shape[1])
+
+        result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
+        (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
+
+        if maxVal > found[0] and maxVal >= accuracy:
+            found = (maxVal, maxLoc, r)
+
     (maxVal, maxLoc, r) = found
     x, y = (int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2)
 
-    return x, y
+    return (x, y)
 
 # KEYPOINT MATCHING
 
+@timing
 def keypoint_locate_one(template, accuracy=0.95):
     screenshot = ImageGrab.grab(None)
     screenshot.save('screen.png')
@@ -165,12 +185,130 @@ def keypoint_locate_one(template, accuracy=0.95):
     if len(list_x) > 0 and len(list_y) > 0:
         x, y = np.mean(list_x[round(0.1 * len(list_x)): round(-0.1 * len(list_x))]), np.mean(list_y[round(0.1 * len(list_y)): round(-0.1 * len(list_y))])
 
-    return x, y
+    return (x, y)
 
 
 def main():
     test_data, true_positions = prepare_test_data('template.png')
-    # TODO evaluate metrics
+
+    accuracy_results = [
+        # my_locate_one
+        [
+            ['''
+            increase
+            percentage_5
+                mean accuracy
+            percentage_10
+                mean accuracy
+            ..................
+            percentage_50
+                mean accuracy
+            '''],
+
+            # decrease
+            [],
+
+            # inc+dec
+            []
+        ],
+
+        # scale_locate_one
+        [
+            # increase
+            [],
+
+            # decrease
+            [],
+
+            # inc+dec
+            []
+        ],
+
+        # keypoint_locate_one
+        [
+            # increase
+            [],
+
+            # decrease
+            [],
+
+            # inc+dec
+            []
+        ]
+    ]
+
+    time_results = [
+        # my_locate_one
+        [
+            ['''
+            increase
+            percentage_5
+                mean time
+            percentage_10
+                mean time
+            ..................
+            percentage_50
+                mean time
+            '''],
+
+            # decrease
+            [],
+
+            # inc+dec
+            []
+        ],
+
+        # scale_locate_one
+        [
+            # increase
+            [],
+
+            # decrease
+            [],
+
+            # inc+dec
+            []
+        ],
+
+        # keypoint_locate_one
+        [
+            # increase
+            [],
+
+            # decrease
+            [],
+
+            # inc+dec
+            []
+        ]
+    ]
+
+    i = -1
+    for alg in (locate_one, scale_locate_one, keypoint_locate_one):
+        i += 1
+        for scale_type in range(len(test_data)):
+            for percentage in range(len(test_data[scale_type])):
+                p_res = []
+                times = []
+                for template in range(len(test_data[scale_type][percentage])):
+                    point_res, time = alg(test_data[scale_type][percentage][template])
+                    times.append(time)
+
+                    # TODO check time working
+                    print(point_res, time)
+
+                    accuracy = 1 - math.dist(true_positions[scale_type][percentage][template], point_res) / min(w//2, h//2)
+                    if accuracy < 0:
+                        accuracy = 0
+                    p_res.append(accuracy)
+
+                times[i][scale_type].append(np.mean(times))
+                results[i][scale_type].append(np.mean(p_res))
+
+    # TODO compare results, may be write to excel
+    print(accuracy_results)
+    print(time_results)
+
 
 if __name__ == "__main__":
     main()

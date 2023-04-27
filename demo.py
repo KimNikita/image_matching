@@ -288,7 +288,7 @@ def locate_all(template, count, accuracy=0.95, second_try=False, similarity=4):
 # MULTI SCALE TEMPLATE MATCHING
 
 
-def scale_locate_one(template):
+def scale_locate_one(template, accuracy=0.95):
     # import the necessary packages
     import numpy as np
     import imutils
@@ -326,7 +326,7 @@ def scale_locate_one(template):
         (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
         # if we have found a new maximum correlation value, then update
         # the bookkeeping variable
-        if maxVal > found[0]:
+        if maxVal > found[0] and maxVal >= accuracy:
             found = (maxVal, maxLoc, r)
     (maxVal, maxLoc, r) = found
     (startX, startY) = (int(maxLoc[0] * r), int(maxLoc[1] * r))
