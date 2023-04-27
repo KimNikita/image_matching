@@ -349,19 +349,19 @@ def main():
                     a_res.append(accuracy)
 
                 # DEBUG
-                time_results[i][scale_type].append(times)
-                accuracy_results[i][scale_type].append(a_res)
-                point_results[i][scale_type].append(p_res)
+                # time_results[i][scale_type].append(times)
+                # accuracy_results[i][scale_type].append(a_res)
+                # point_results[i][scale_type].append(p_res)
 
                 # RELEASE
-                #time_results[i][scale_type].append(np.mean(times))
-                #accuracy_results[i][scale_type].append(np.mean(a_res))
+                time_results[i][scale_type].append(np.mean(times))
+                accuracy_results[i][scale_type].append(np.mean(a_res))
 
-    # TODO check results write to excel
+    # DEBUG
     print(point_results)
     print()
     print(accuracy_results)
-'''
+
     import xlsxwriter
 
     workbook = xlsxwriter.Workbook('results.xlsx')
@@ -403,9 +403,9 @@ def main():
         row+=1
         worksheet.write(row, 0, p)
         for col, alg in enumerate(accuracy_results):
-            worksheet.write(row, col+1, alg[1][row-1])
+            worksheet.write(row, col+1, alg[1][row-12])
         for col, alg in enumerate(time_results):
-            worksheet.write(row, col+5, alg[1][row-1])
+            worksheet.write(row, col+5, alg[1][row-12])
 
     # incdec table
     worksheet.write(22, 0, '"%" incdec')
@@ -423,12 +423,12 @@ def main():
         row+=1
         worksheet.write(row, 0, p)
         for col, alg in enumerate(accuracy_results):
-            worksheet.write(row, col+1, alg[2][row-1])
+            worksheet.write(row, col+1, alg[2][row-23])
         for col, alg in enumerate(time_results):
-            worksheet.write(row, col+5, alg[2][row-1])
+            worksheet.write(row, col+5, alg[2][row-23])
 
     
     workbook.close()
-'''
+
 if __name__ == "__main__":
     main()
