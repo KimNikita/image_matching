@@ -4,14 +4,15 @@ import numpy as np
 from PIL import ImageGrab
 from resizer import prepare_test_data
 import math
+import timeit
 
 # multi scale
 import imutils
 
 def timing(f):
-    def wrapper(template):
+    def wrapper(screenshot, template):
         start_time = timeit.default_timer()
-        result = f(template)
+        result = f(screenshot, template)
         ellapsed_time = timeit.default_timer() - start_time
         return result, ellapsed_time
     return wrapper
@@ -19,11 +20,7 @@ def timing(f):
 
 # MY TEMPLATE MATCHING
 @timing
-def locate_one(template, accuracy=0.95, second_try=True, similarity=4):
-    screenshot = ImageGrab.grab(None)
-    screenshot.save('screen.png')
-    screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
-
+def locate_one(screenshot, template, accuracy=0.95, second_try=True, similarity=4):
     if isinstance(template, str):
         template = cv.imread(template, cv.IMREAD_GRAYSCALE)
         if template is None:
@@ -42,7 +39,6 @@ def locate_one(template, accuracy=0.95, second_try=True, similarity=4):
 
     _, max_value, _, max_location = cv.minMaxLoc(res)
     w, h = template.shape[::-1]
-    box = (0, 0, 0, 0)
     x, y = -1, -1
 
     if max_value >= accuracy:
@@ -73,11 +69,7 @@ def locate_one(template, accuracy=0.95, second_try=True, similarity=4):
 # MULTI SCALE TEMPLATE MATCHING
 
 @timing
-def scale_locate_one(template, accuracy=0.95):
-    screenshot = ImageGrab.grab(None)
-    screenshot.save('screen.png')
-    screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
-
+def scale_locate_one(screenshot, template, accuracy=0.95):
     if isinstance(template, str):
         template = cv.imread(template, cv.IMREAD_GRAYSCALE)
         if template is None:
@@ -88,7 +80,7 @@ def scale_locate_one(template, accuracy=0.95):
         return None
 
     (h, w) = template.shape[:2]
-    found = (0, (-w//2, -h//2), 1)
+    found_dec = (0, 0, 0)
     # decrease
     for scale in np.linspace(0.2, 1.0, 20)[::-1]:
         resized = imutils.resize(
@@ -101,10 +93,13 @@ def scale_locate_one(template, accuracy=0.95):
         result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
         (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
 
-        if maxVal > found[0] and maxVal >= accuracy:
-            found = (maxVal, maxLoc, r)
+        if maxVal > found_dec[0] and maxVal >= accuracy/2:
+            found_dec = (maxVal, maxLoc, r)
+        else:
+            break
 
     # increase
+    found_inc = (0, 0, 0)
     for scale in np.linspace(0.2, 1.0, 20):
         resized = imutils.resize(
             screenshot, width=int(screenshot.shape[1] * (1+scale)))
@@ -113,22 +108,26 @@ def scale_locate_one(template, accuracy=0.95):
         result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
         (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
 
-        if maxVal > found[0] and maxVal >= accuracy:
-            found = (maxVal, maxLoc, r)
+        if maxVal > found_inc[0] and maxVal >= accuracy/2:
+            found_inc = (maxVal, maxLoc, r)
+        else:
+            break
 
-    (maxVal, maxLoc, r) = found
-    x, y = (int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2)
+    if found_dec[0] > found_inc[0]:
+        (maxVal, maxLoc, r) = found_dec
+    else:
+        (maxVal, maxLoc, r) = found_inc
+    if maxVal == 0:
+        return (-1, -1)
+
+    x, y = int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2
 
     return (x, y)
 
 # KEYPOINT MATCHING
 
 @timing
-def keypoint_locate_one(template, accuracy=0.95):
-    screenshot = ImageGrab.grab(None)
-    screenshot.save('screen.png')
-    screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
-
+def keypoint_locate_one(screenshot, template, accuracy=0.95):
     if isinstance(template, str):
         template = cv.imread(template, cv.IMREAD_GRAYSCALE)
         if template is None:
@@ -182,28 +181,31 @@ def keypoint_locate_one(template, accuracy=0.95):
         list_x.append(i)
         list_y.append(j)
 
-    if len(list_x) > 0 and len(list_y) > 0:
-        x, y = np.mean(list_x[round(0.1 * len(list_x)): round(-0.1 * len(list_x))]), np.mean(list_y[round(0.1 * len(list_y)): round(-0.1 * len(list_y))])
+    if len(list_x) < 1 or len(list_y) < 1:
+        return (x, y)
+    elif len(list_x) > 9 and len(list_y) > 9:
+        x, y = np.mean(list_x[math.floor(0.1 * len(list_x)): math.floor(-0.1 * len(list_x))]), np.mean(list_y[math.floor(0.1 * len(list_y)): math.floor(-0.1 * len(list_y))])
+    else:
+        x, y = np.mean(list_x), np.mean(list_y) 
 
     return (x, y)
 
 
 def main():
-    test_data, true_positions = prepare_test_data('template.png')
+    test_data, true_positions, max_distances = prepare_test_data('template.png')
 
     accuracy_results = [
         # my_locate_one
         [
-            ['''
-            increase
-            percentage_5
-                mean accuracy
-            percentage_10
-                mean accuracy
-            ..................
-            percentage_50
-                mean accuracy
-            '''],
+            #increase
+                #percentage_5
+                    #mean accuracy
+                #percentage_10
+                    #mean accuracy
+                #..................
+                #percentage_50
+                    #mean accuracy
+            [],
 
             # decrease
             [],
@@ -240,16 +242,15 @@ def main():
     time_results = [
         # my_locate_one
         [
-            ['''
-            increase
-            percentage_5
-                mean time
-            percentage_10
-                mean time
-            ..................
-            percentage_50
-                mean time
-            '''],
+            #increase
+                #percentage_5
+                    #mean time
+                #percentage_10
+                    #mean time
+                #..................
+                #percentage_50
+                    #mean time
+            [],
 
             # decrease
             [],
@@ -283,32 +284,84 @@ def main():
         ]
     ]
 
+    point_results = [
+        # my_locate_one
+        [
+            [],
+
+            [],
+
+            []
+        ],
+
+        # scale_locate_one
+        [
+            # increase
+            [],
+
+            # decrease
+            [],
+
+            # inc+dec
+            []
+        ],
+
+        # keypoint_locate_one
+        [
+            # increase
+            [],
+
+            # decrease
+            [],
+
+            # inc+dec
+            []
+        ]
+    ]
+
     i = -1
     for alg in (locate_one, scale_locate_one, keypoint_locate_one):
         i += 1
+        print(f'Stage: {i}')
         for scale_type in range(len(test_data)):
             for percentage in range(len(test_data[scale_type])):
-                p_res = []
+                p_res=[]
+                a_res = []
                 times = []
-                for template in range(len(test_data[scale_type][percentage])):
-                    point_res, time = alg(test_data[scale_type][percentage][template])
+                for screenshot in range(len(test_data[scale_type][percentage])):
+                    test_screenshot = test_data[scale_type][percentage][screenshot].copy()
+                    
+                    # TODO fix not finding
+                    point_res, time = alg(test_screenshot, 'template.png')
+                    p_res.append(point_res)
                     times.append(time)
 
-                    # TODO check time working
-                    print(point_res, time)
+                    accuracy = 1
+                    if point_res[0] < 0 or point_res[1] < 0:
+                        # алгоритм не нашел
+                        accuracy = -1
+                    else:
+                        # ВАЖНО!!! если accuracy > 0 значит алгоритм в любом случае попадет по контролу, насколько accuracy близко к 1 не так важно 
+                        accuracy = 1 - math.dist(true_positions[scale_type][percentage][screenshot], point_res) / max_distances[scale_type][percentage][screenshot] 
+                        # алгоритм промахнулся
+                        if accuracy < 0:
+                            accuracy = 0
+                    a_res.append(accuracy)
 
-                    accuracy = 1 - math.dist(true_positions[scale_type][percentage][template], point_res) / min(w//2, h//2)
-                    if accuracy < 0:
-                        accuracy = 0
-                    p_res.append(accuracy)
+                # DEBUG
+                time_results[i][scale_type].append(times)
+                accuracy_results[i][scale_type].append(a_res)
+                point_results[i][scale_type].append(p_res)
 
-                times[i][scale_type].append(np.mean(times))
-                results[i][scale_type].append(np.mean(p_res))
+                # RELEASE
+                #time_results[i][scale_type].append(np.mean(times))
+                #accuracy_results[i][scale_type].append(np.mean(a_res))
 
     # TODO check results write to excel
+    print(point_results)
+    print()
     print(accuracy_results)
-    print(time_results)
-
+'''
     import xlsxwriter
 
     workbook = xlsxwriter.Workbook('results.xlsx')
@@ -376,6 +429,6 @@ def main():
 
     
     workbook.close()
-
+'''
 if __name__ == "__main__":
     main()

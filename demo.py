@@ -155,7 +155,7 @@ def locate_one(template, accuracy=0.95, second_try=False, similarity=4):
 
     _, max_value, _, max_location = cv.minMaxLoc(res)
     w, h = template.shape[::-1]
-    box = (0, 0, 0, 0)
+    box = (-1, -1, -1, -1)
 
     # DEBUG
     x = max_location[0] + w//2
@@ -309,7 +309,8 @@ def scale_locate_one(template, accuracy=0.95):
         return None
 
     (h, w) = template.shape[:2]
-    found = (0, 0, 0)
+    found_dec = (0, 0, 0)
+    # decrease
     # loop over the scales of the image
     for scale in np.linspace(0.2, 1.0, 20)[::-1]:
         # resize the image according to the scale, and keep track
@@ -326,9 +327,32 @@ def scale_locate_one(template, accuracy=0.95):
         (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
         # if we have found a new maximum correlation value, then update
         # the bookkeeping variable
-        if maxVal > found[0] and maxVal >= accuracy:
-            found = (maxVal, maxLoc, r)
-    (maxVal, maxLoc, r) = found
+        if maxVal > found_dec[0] and maxVal >= accuracy/2:
+            found_dec = (maxVal, maxLoc, r)
+        else:
+            break
+
+    # increase
+    found_inc = (0, 0, 0)
+    for scale in np.linspace(0.04, 0.84, 20):
+        resized = imutils.resize(
+            screenshot, width=int(screenshot.shape[1] * (1+scale)))
+        r = screenshot.shape[1] / float(resized.shape[1])
+
+        result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
+        (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
+
+        if maxVal > found_inc[0] and maxVal >= accuracy/2:
+            found_inc = (maxVal, maxLoc, r)
+        else:
+            break
+
+    if found_dec[0] > found_inc[0]:
+        (maxVal, maxLoc, r) = found_dec
+    else:
+        (maxVal, maxLoc, r) = found_inc
+    if maxVal == 0:
+        return (-1, -1, -1, -1)
     (startX, startY) = (int(maxLoc[0] * r), int(maxLoc[1] * r))
     (endX, endY) = (int((maxLoc[0] + w) * r), int((maxLoc[1] + h) * r))
 
@@ -399,7 +423,7 @@ def keypoint_locate_one(template, accuracy=0.95):
     # Initialize lists
     list_x = []
     list_y = []
-    box = (0, 0, 0, 0)
+    box = (-1, -1, -1, -1)
 
     # For each match...
     for mat in best_matches:
@@ -415,31 +439,31 @@ def keypoint_locate_one(template, accuracy=0.95):
         list_x.append(x)
         list_y.append(y)
 
-    # TODO есть trim_mean в scipy
+    if len(list_x) < 1 or len(list_y) < 1:
+        return box
+    elif len(list_x) > 9 and len(list_y) > 9:
+        max_location = np.mean(list_x[math.floor(0.1 * len(list_x)): math.floor(-0.1 * len(list_x))]), np.mean(list_y[math.floor(0.1 * len(list_y)): math.floor(-0.1 * len(list_y))])
+    else:
+        max_location = np.mean(list_x), np.mean(list_y) 
 
-    def slice_mean(freq, percent):
-        return np.mean(freq[round(percent * len(freq)): round(-percent * len(freq))])
-
-    if len(list_x) > 0 and len(list_y) > 0:
-        max_location = (slice_mean(list_x, 0.1), slice_mean(list_y, 0.1))
-        box = (max_location[0] - w//2, max_location[1] - h//2,
+    box = (max_location[0] - w//2, max_location[1] - h//2,
                max_location[0] + w//2, max_location[1] + h//2)
 
-        # DEBUG
-        cv.rectangle(screenshot, (box[0], box[1]),
-                     (box[2], box[3]), (0, 0, 255), 2)
-        cv.imshow("Result", screenshot)
-        cv.waitKey(0)
+    # DEBUG
+    cv.rectangle(screenshot, (box[0], box[1]),
+                    (box[2], box[3]), (0, 0, 255), 2)
+    cv.imshow("Result", screenshot)
+    cv.waitKey(0)
 
     return box
 
 
 def main():
-    # by_image(None, 'original.png', second_try=True)
-    # result = locate_all('original.png', 5, second_try=True)
-    # result = locate_one('original.png', second_try=True)
-    # result = scale_locate_one('original.png')
-    result = keypoint_locate_one('original.png')
+    # by_image(None, 'template.png', second_try=True)
+    # result = locate_all('template.png', 5, second_try=True)
+    # result = locate_one('template.png', second_try=True)
+    result = scale_locate_one('template.png')
+    # result = keypoint_locate_one('template.png')
     print(result)
 
 

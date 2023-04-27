@@ -13,22 +13,21 @@ def prepare_test_data(template):
     h, w = template.shape
 
     test_data=[
-        [ '''
-        increase
-            percentage_5
-                image with scale_1
-                image with scale_2
-                image with scale_3
-            percentage_10
-                image with scale_1
-                image with scale_2
-                image with scale_3
-            ...
-            percentage_50
-                image with scale_1
-                image with scale_2
-                image with scale_3
-        '''],
+        #increase
+            #percentage_5
+                #image with scale_1
+                #image with scale_2
+                #image with scale_3
+            #percentage_10
+                #image with scale_1
+                #image with scale_2
+                #image with scale_3
+            #...
+            #percentage_50
+                #image with scale_1
+                #image with scale_2
+                #image with scale_3
+        [],
 
         #decrease
         [],
@@ -38,27 +37,32 @@ def prepare_test_data(template):
     ]
 
     true_positions=[
-        ['''
-        increase
-            percentage_5
-                center of image with scale_1
-                center of image with scale_2
-                center of image with scale_3
-            percentage_10
-                center of image with scale_1
-                center of image with scale_2
-                center of image with scale_3
-            ...
-            percentage_50
-                center of image with scale_1
-                center of image with scale_2
-                center of image with scale_3
-        '''],
+        #increase
+            #percentage_5
+                #center of image with scale_1
+                #center of image with scale_2
+                #center of image with scale_3
+            #percentage_10
+                #center of image with scale_1
+                #center of image with scale_2
+                #center of image with scale_3
+            #...
+            #percentage_50
+                #center of image with scale_1
+                #center of image with scale_2
+                #center of image with scale_3
+        [],
 
         #decrease
         [],
 
         #inc+dec
+        []
+    ]
+
+    max_distances=[
+        [],
+        [],
         []
     ]
 
@@ -71,19 +75,27 @@ def prepare_test_data(template):
         for scale_type in range(len(scales)): 
             p_list=[]
             pos_list=[]
+            dist_list=[]
             for scale in range(len(scales[scale_type])):
-                # TODO merge resized & screenshot -> data, calculate center -> pos 
-                data = cv.resize(template, scales[scale_type][scale])
-                pos = (w//2, h//2)
+                resized = cv.resize(template, scales[scale_type][scale])
+                r_h, r_w = resized.shape
+                dist_list.append(min(r_w//2, r_h//2))
+                
+                data = screenshot.copy()
+                pos = (s_w//2, s_h//2)
 
+                x_offset = s_w//2 - r_w//2
+                y_offset = s_h//2 - r_h//2
+                data[y_offset:y_offset+r_h, x_offset:x_offset+r_w] = resized
+                
                 p_list.append(data)
                 pos_list.append(pos)
-                
+
+            max_distances[scale_type].append(dist_list)
             test_data[scale_type].append(p_list)
             true_positions[scale_type].append(pos_list)
             
-            
-    return test_data, true_positions
+    return test_data, true_positions, max_distances
 
 
 def prepare_resized(template, inc_path, dec_path, inc_dec_path):
@@ -103,7 +115,7 @@ def prepare_resized(template, inc_path, dec_path, inc_dec_path):
 
 
 def main():
-    prepare_resized('original.png', 'test_data\increase', 'test_data\decrease', 'test_data\incdec')
+    prepare_resized('template.png', 'test_data\increase', 'test_data\decrease', 'test_data\incdec')
 
 
 if __name__ == "__main__":
