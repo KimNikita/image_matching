@@ -162,6 +162,7 @@ def locate_one(template, accuracy=0.95, second_try=False, similarity=4):
     y = max_location[1] + h//2
     print(x, y, max_value)
 
+    # TODO fix validation
     if max_value >= accuracy:
         box = (max_location[0], max_location[1],
                max_location[0] + w, max_location[1] + h)
@@ -310,6 +311,7 @@ def scale_locate_one(template, accuracy=0.95):
 
     (h, w) = template.shape[:2]
     found_dec = (0, 0, 0)
+    mean_acc=([], [])
     # decrease
     # loop over the scales of the image
     for scale in np.linspace(0.2, 1.0, 20)[::-1]:
@@ -325,13 +327,18 @@ def scale_locate_one(template, accuracy=0.95):
 
         result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
         (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
+        # DEBUG
+        print(maxVal)
         # if we have found a new maximum correlation value, then update
         # the bookkeeping variable
-        if maxVal > found_dec[0] and maxVal >= accuracy/2:
+        mean_acc[0].append(maxVal)
+        if maxVal > found_dec[0]:
             found_dec = (maxVal, maxLoc, r)
         else:
             break
 
+    # DEBUG
+    print()
     # increase
     found_inc = (0, 0, 0)
     for scale in np.linspace(0.04, 0.84, 20):
@@ -341,22 +348,30 @@ def scale_locate_one(template, accuracy=0.95):
 
         result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
         (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
-
-        if maxVal > found_inc[0] and maxVal >= accuracy/2:
+        # DEBUG
+        print(maxVal)
+        mean_acc[1].append(maxVal)
+        if maxVal > found_inc[0]:
             found_inc = (maxVal, maxLoc, r)
         else:
             break
 
+    validation = 0
     if found_dec[0] > found_inc[0]:
+        validation=np.mean(mean_acc[0])
         (maxVal, maxLoc, r) = found_dec
     else:
+        validation=np.mean(mean_acc[1])
         (maxVal, maxLoc, r) = found_inc
-    if maxVal == 0:
-        return (-1, -1, -1, -1)
+    # TODO fix validation
+    #if maxVal < (1 + accuracy) * validation:
+       # return (-1, -1, -1, -1)
     (startX, startY) = (int(maxLoc[0] * r), int(maxLoc[1] * r))
     (endX, endY) = (int((maxLoc[0] + w) * r), int((maxLoc[1] + h) * r))
 
     # DEBUG
+    print()
+    print(validation)
     print(maxVal)
     cv.rectangle(screenshot, (startX, startY), (endX, endY), (0, 0, 255), 2)
     cv.imshow("Result", screenshot)
@@ -371,6 +386,7 @@ def keypoint_locate_one(template, accuracy=0.95):
     import numpy as np
     import cv2 as cv
     from PIL import ImageGrab
+    import math
 
     screenshot = ImageGrab.grab(None)
     screenshot.save('screen.png')
@@ -442,12 +458,12 @@ def keypoint_locate_one(template, accuracy=0.95):
     if len(list_x) < 1 or len(list_y) < 1:
         return box
     elif len(list_x) > 9 and len(list_y) > 9:
-        max_location = np.mean(list_x[math.floor(0.1 * len(list_x)): math.floor(-0.1 * len(list_x))]), np.mean(list_y[math.floor(0.1 * len(list_y)): math.floor(-0.1 * len(list_y))])
+        max_location = np.mean(sorted(list_x)[math.ceil(0.1 * len(list_x)): math.ceil(-0.1 * len(list_x))]), np.mean(sorted(list_y)[math.ceil(0.1 * len(list_y)): math.ceil(-0.1 * len(list_y))])
     else:
-        max_location = np.mean(list_x), np.mean(list_y) 
+        max_location = np.mean(list_x), np.mean(list_y)
 
-    box = (max_location[0] - w//2, max_location[1] - h//2,
-               max_location[0] + w//2, max_location[1] + h//2)
+    box = (int(max_location[0] - w//2), int(max_location[1] - h//2),
+               int(max_location[0] + w//2), int(max_location[1] + h//2))
 
     # DEBUG
     cv.rectangle(screenshot, (box[0], box[1]),
@@ -462,8 +478,8 @@ def main():
     # by_image(None, 'template.png', second_try=True)
     # result = locate_all('template.png', 5, second_try=True)
     # result = locate_one('template.png', second_try=True)
-    result = scale_locate_one('template.png')
-    # result = keypoint_locate_one('template.png')
+    # result = scale_locate_one('template.png')
+    result = keypoint_locate_one('template.png')
     print(result)
 
 
