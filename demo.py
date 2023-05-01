@@ -1,6 +1,6 @@
 # TODO fix save path for screenshot
 
-# FINAL FUNCTION
+# FINAL FUNCTIONS
 def by_image(self, template, accuracy=0.95, second_try=False, similarity=4):
     '''
     template - path to template image of control.\n
@@ -114,94 +114,6 @@ def by_image(self, template, accuracy=0.95, second_try=False, similarity=4):
     plt.title('Detected Point'), plt.xticks([]), plt.yticks([])
     plt.show()
 
-# MY TEMPLATE MATCHING
-
-
-def locate_one(template, accuracy=0.95, second_try=False, similarity=4):
-    '''
-    template - path to template image of control.\n
-    accuracy - the percentage of pixels matching the template image and the one found on the screen. Default 0.95.\n
-    second_try - indicates whether to use a different search method based on the similarity score.
-    Useful when the size of template image has been changed. Default False.\n
-    similarity - an integer on a five-point scale, sets the minimum similarity of the template image and the one found on the screen.
-    Used with second_try=True. Default 4.\n
-    Second search method works better in cases when the size of the template image has been increased.
-    Function returns rectangle coordinates (upper_left_x, upper_left_y, lower_right_x, lower_right_y) of found control.
-    Size of rectangle are equal to template image size.
-    '''
-    import cv2 as cv
-    import numpy as np
-    from PIL import ImageGrab
-
-    screenshot = ImageGrab.grab(None)
-    screenshot.save('screen.png')
-    screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
-
-    if isinstance(template, str):
-        template = cv.imread(template, cv.IMREAD_GRAYSCALE)
-        if template is None:
-            print('Cannot read image, check cv2.imread() documentation')
-            return None
-    else:
-        print('Invalid format of image')
-        return None
-
-    # Apply template Matching
-    res = cv.matchTemplate(screenshot, template, cv.TM_CCOEFF_NORMED)
-
-    if similarity <= 0:
-        similarity = 1
-    similarity = similarity/100-0.001
-
-    _, max_value, _, max_location = cv.minMaxLoc(res)
-    w, h = template.shape[::-1]
-    box = (-1, -1, -1, -1)
-
-    # DEBUG
-    x = max_location[0] + w//2
-    y = max_location[1] + h//2
-    print(x, y, max_value)
-
-    # TODO fix validation
-    if max_value >= accuracy:
-        box = (max_location[0], max_location[1],
-               max_location[0] + w, max_location[1] + h)
-
-        # DEBUG
-        cv.rectangle(screenshot, max_location,
-                     (max_location[0] + w, max_location[1] + h), (0, 0, 255), 2)
-
-    elif second_try:
-        # Getting each value in format 0.00
-        val00 = round(res[max_location[1]-1][max_location[0]-1], 2)
-        val01 = round(res[max_location[1]][max_location[0]-1], 2)
-        val02 = round(res[max_location[1]+1][max_location[0]-1], 2)
-
-        val10 = round(res[max_location[1]-1][max_location[0]], 2)
-        val12 = round(res[max_location[1]+1][max_location[0]], 2)
-
-        val20 = round(res[max_location[1]-1][max_location[0]+1], 2)
-        val21 = round(res[max_location[1]][max_location[0]+1], 2)
-        val22 = round(res[max_location[1]+1][max_location[0]+1], 2)
-
-        # Make sure that vertical and horizontal values way bigger than in the corners
-        if abs(val01-val00)+abs(val01-val02) >= similarity and abs(val10-val00)+abs(val10-val20) >= similarity \
-                and abs(val21-val20)+abs(val21-val22) >= similarity and abs(val12-val02)+abs(val12-val22) >= similarity:
-
-            box = (max_location[0], max_location[1],
-                   max_location[0] + w, max_location[1] + h)
-
-            # DEBUG
-            cv.rectangle(screenshot, max_location,
-                         (max_location[0] + w, max_location[1] + h), (0, 0, 255), 2)
-
-    # DEBUG
-    cv.imshow("Result", screenshot)
-    cv.waitKey(0)
-
-    return box
-
-
 def locate_all(template, count, accuracy=0.95, second_try=False, similarity=4):
     '''
     template - path to template image of control.\n
@@ -286,6 +198,101 @@ def locate_all(template, count, accuracy=0.95, second_try=False, similarity=4):
 
     return boxes
 
+# MY TEMPLATE MATCHING
+
+def locate_one(template, accuracy=0.95, second_try=False, similarity=4):
+    '''
+    template - path to template image of control.\n
+    accuracy - the percentage of pixels matching the template image and the one found on the screen. Default 0.95.\n
+    second_try - indicates whether to use a different search method based on the similarity score.
+    Useful when the size of template image has been changed. Default False.\n
+    similarity - an integer on a five-point scale, sets the minimum similarity of the template image and the one found on the screen.
+    Used with second_try=True. Default 4.\n
+    Second search method works better in cases when the size of the template image has been increased.
+    Function returns rectangle coordinates (upper_left_x, upper_left_y, lower_right_x, lower_right_y) of found control.
+    Size of rectangle are equal to template image size.
+    '''
+    import cv2 as cv
+    import numpy as np
+    from PIL import ImageGrab
+
+    screenshot = ImageGrab.grab(None)
+    screenshot.save('screen.png')
+    screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
+
+    if isinstance(template, str):
+        template = cv.imread(template, cv.IMREAD_GRAYSCALE)
+        if template is None:
+            print('Cannot read image, check cv2.imread() documentation')
+            return None
+    else:
+        print('Invalid format of image')
+        return None
+
+    # Apply template Matching
+    res = cv.matchTemplate(screenshot, template, cv.TM_CCOEFF_NORMED)
+
+    if similarity <= 0:
+        similarity = 1
+    similarity = similarity/100-0.001
+
+    _, max_value, _, max_location = cv.minMaxLoc(res)
+    w, h = template.shape[::-1]
+    box = (-1, -1, -1, -1)
+
+    # DEBUG
+    x = max_location[0] + w//2
+    y = max_location[1] + h//2
+    print(x, y, max_value)
+
+    if max_value >= accuracy:
+        box = (max_location[0], max_location[1],
+               max_location[0] + w, max_location[1] + h)
+
+        # DEBUG
+        cv.rectangle(screenshot, max_location,
+                     (max_location[0] + w, max_location[1] + h), (0, 0, 255), 2)
+
+    elif second_try:
+        # Getting each value in format 0.00
+        val00 = round(res[max_location[1]-1][max_location[0]-1], 2)
+        val01 = round(res[max_location[1]][max_location[0]-1], 2)
+        val02 = round(res[max_location[1]+1][max_location[0]-1], 2)
+
+        val10 = round(res[max_location[1]-1][max_location[0]], 2)
+        val12 = round(res[max_location[1]+1][max_location[0]], 2)
+
+        val20 = round(res[max_location[1]-1][max_location[0]+1], 2)
+        val21 = round(res[max_location[1]][max_location[0]+1], 2)
+        val22 = round(res[max_location[1]+1][max_location[0]+1], 2)
+
+        # TODO fix validation
+        # Make sure that vertical and horizontal values way bigger than in the corners
+        valid_score = 0
+        if abs(val01-val00)+abs(val01-val02) >= similarity:
+            valid_score += 1
+        if abs(val10-val00)+abs(val10-val20) >= similarity:
+            valid_score += 1
+        if abs(val21-val20)+abs(val21-val22) >= similarity:
+            valid_score += 1
+        if abs(val12-val02)+abs(val12-val22) >= similarity:
+            valid_score += 1    
+        
+        if valid_score >= 2:
+            box = (max_location[0], max_location[1],
+                   max_location[0] + w, max_location[1] + h)
+
+            # DEBUG
+            cv.rectangle(screenshot, max_location,
+                         (max_location[0] + w, max_location[1] + h), (0, 0, 255), 2)
+
+    # DEBUG
+    cv.imshow("Result", screenshot)
+    cv.waitKey(0)
+
+    return box
+
+
 # MULTI SCALE TEMPLATE MATCHING
 
 
@@ -331,8 +338,8 @@ def scale_locate_one(template, accuracy=0.95):
         print(maxVal)
         # if we have found a new maximum correlation value, then update
         # the bookkeeping variable
-        mean_acc[0].append(maxVal)
         if maxVal > found_dec[0]:
+            mean_acc[0].append(found_dec[0])
             found_dec = (maxVal, maxLoc, r)
         else:
             break
@@ -350,8 +357,8 @@ def scale_locate_one(template, accuracy=0.95):
         (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
         # DEBUG
         print(maxVal)
-        mean_acc[1].append(maxVal)
         if maxVal > found_inc[0]:
+            mean_acc[1].append(found_inc[0])
             found_inc = (maxVal, maxLoc, r)
         else:
             break
@@ -364,15 +371,14 @@ def scale_locate_one(template, accuracy=0.95):
         validation=np.mean(mean_acc[1])
         (maxVal, maxLoc, r) = found_inc
     # TODO fix validation
-    #if maxVal < (1 + accuracy) * validation:
-       # return (-1, -1, -1, -1)
+    # print(validation, maxVal)
+    if maxVal < validation + 0.02 * accuracy:
+        return (-1, -1)
     (startX, startY) = (int(maxLoc[0] * r), int(maxLoc[1] * r))
     (endX, endY) = (int((maxLoc[0] + w) * r), int((maxLoc[1] + h) * r))
 
     # DEBUG
     print()
-    print(validation)
-    print(maxVal)
     cv.rectangle(screenshot, (startX, startY), (endX, endY), (0, 0, 255), 2)
     cv.imshow("Result", screenshot)
     cv.waitKey(0)

@@ -9,6 +9,7 @@ import timeit
 # multi scale
 import imutils
 
+
 def timing(f):
     def wrapper(screenshot, template):
         start_time = timeit.default_timer()
@@ -18,9 +19,37 @@ def timing(f):
     return wrapper
 
 
-# MY TEMPLATE MATCHING
+# BASE TEMPLATE MATCHING
 @timing
-def locate_one(screenshot, template, accuracy=0.95, second_try=True, similarity=4):
+def base_locate_one(screenshot, template, accuracy=0.95):
+    if isinstance(template, str):
+        template = cv.imread(template, cv.IMREAD_GRAYSCALE)
+        if template is None:
+            print('Cannot read image, check cv2.imread() documentation')
+            return None
+    else:
+        print('Invalid format of image')
+        return None
+
+    # Apply template Matching
+    res = cv.matchTemplate(screenshot, template, cv.TM_CCOEFF_NORMED)
+
+    _, max_value, _, max_location = cv.minMaxLoc(res)
+
+    w, h = template.shape[::-1]
+
+    x, y = -1, -1
+    if max_value >= accuracy:
+        x = max_location[0] + w//2
+        y = max_location[1] + h//2
+
+    return (x, y)
+
+# MY TEMPLATE MATCHING
+
+
+@timing
+def my_locate_one(screenshot, template, accuracy=0.95, second_try=True, similarity=4):
     if isinstance(template, str):
         template = cv.imread(template, cv.IMREAD_GRAYSCALE)
         if template is None:
@@ -35,19 +64,14 @@ def locate_one(screenshot, template, accuracy=0.95, second_try=True, similarity=
 
     if similarity <= 0:
         similarity = 1
-    similarity = similarity/100-0.001
+    similarity = similarity/100-0.002
 
     _, max_value, _, max_location = cv.minMaxLoc(res)
 
     w, h = template.shape[::-1]
 
-    # FOR TEST
-    x = max_location[0] + w//2
-    y = max_location[1] + h//2
-    return (x, y)
-
     x, y = -1, -1
-    # TODO fix validation
+
     if max_value >= accuracy:
         x = max_location[0] + w//2
         y = max_location[1] + h//2
@@ -64,16 +88,26 @@ def locate_one(screenshot, template, accuracy=0.95, second_try=True, similarity=
         val21 = round(res[max_location[1]][max_location[0]+1], 2)
         val22 = round(res[max_location[1]+1][max_location[0]+1], 2)
 
+        # TODO fix validation
         # Make sure that vertical and horizontal values way bigger than in the corners
-        if abs(val01-val00)+abs(val01-val02) >= similarity and abs(val10-val00)+abs(val10-val20) >= similarity \
-                and abs(val21-val20)+abs(val21-val22) >= similarity and abs(val12-val02)+abs(val12-val22) >= similarity:
+        valid_score = 0
+        if abs(val01-val00)+abs(val01-val02) >= similarity:
+            valid_score += 1
+        if abs(val10-val00)+abs(val10-val20) >= similarity:
+            valid_score += 1
+        if abs(val21-val20)+abs(val21-val22) >= similarity:
+            valid_score += 1
+        if abs(val12-val02)+abs(val12-val22) >= similarity:
+            valid_score += 1
 
+        if valid_score >= 2:
             x = max_location[0] + w//2
             y = max_location[1] + h//2
 
     return (x, y)
 
 # MULTI SCALE TEMPLATE MATCHING
+
 
 @timing
 def scale_locate_one(screenshot, template, accuracy=0.95):
@@ -88,7 +122,7 @@ def scale_locate_one(screenshot, template, accuracy=0.95):
 
     (h, w) = template.shape[:2]
     found_dec = (0, 0, 0)
-    mean_acc=([], [])
+    mean_acc = ([], [])
     # decrease
     for scale in np.linspace(0.2, 1.0, 20)[::-1]:
         resized = imutils.resize(
@@ -101,8 +135,8 @@ def scale_locate_one(screenshot, template, accuracy=0.95):
         result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
         (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
 
-        mean_acc[0].append(maxVal)
         if maxVal > found_dec[0]:
+            mean_acc[0].append(found_dec[0])
             found_dec = (maxVal, maxLoc, r)
         else:
             break
@@ -117,28 +151,30 @@ def scale_locate_one(screenshot, template, accuracy=0.95):
         result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
         (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
 
-        mean_acc[1].append(maxVal)
         if maxVal > found_inc[0]:
+            mean_acc[1].append(found_inc[0])
             found_inc = (maxVal, maxLoc, r)
         else:
             break
 
     validation = 0
     if found_dec[0] > found_inc[0]:
-        validation=np.mean(mean_acc[0])
+        validation = np.mean(mean_acc[0])
         (maxVal, maxLoc, r) = found_dec
     else:
-        validation=np.mean(mean_acc[1])
+        validation = np.mean(mean_acc[1])
         (maxVal, maxLoc, r) = found_inc
     # TODO fix validation
-    #if maxVal < (1 + accuracy) * validation:
-        #return (-1, -1)
+    # print(validation, maxVal)
+    if maxVal < validation + 0.02 * accuracy:
+        return (-1, -1)
 
     x, y = int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2
 
     return (x, y)
 
 # KEYPOINT MATCHING
+
 
 @timing
 def keypoint_locate_one(screenshot, template, accuracy=0.95):
@@ -206,25 +242,36 @@ def keypoint_locate_one(screenshot, template, accuracy=0.95):
 
 
 def main():
-    test_data, true_positions, max_distances = prepare_test_data('template.png')
+    test_data, true_positions, max_distances = prepare_test_data(
+        'template.png')
 
     accuracy_results = [
+        # base template matching
+        [
+            [],
+            [],
+            [],
+            []
+        ],
+
         # my_locate_one
         [
-            #increase
-                #percentage_5
-                    #mean accuracy
-                #percentage_10
-                    #mean accuracy
-                #..................
-                #percentage_50
-                    #mean accuracy
+            # increase
+            # percentage_5
+            # mean accuracy
+            # percentage_10
+            # mean accuracy
+            # ..................
+            # percentage_50
+            # mean accuracy
             [],
 
             # decrease
             [],
 
             # inc+dec
+            [],
+
             []
         ],
 
@@ -237,6 +284,8 @@ def main():
             [],
 
             # inc+dec
+            [],
+
             []
         ],
 
@@ -249,27 +298,38 @@ def main():
             [],
 
             # inc+dec
+            [],
+
             []
         ]
     ]
 
     time_results = [
+        # base template matching
+        [
+            [],
+            [],
+            [],
+            []
+        ],
         # my_locate_one
         [
-            #increase
-                #percentage_5
-                    #mean time
-                #percentage_10
-                    #mean time
-                #..................
-                #percentage_50
-                    #mean time
+            # increase
+            # percentage_5
+            # mean time
+            # percentage_10
+            # mean time
+            # ..................
+            # percentage_50
+            # mean time
             [],
 
             # decrease
             [],
 
             # inc+dec
+            [],
+
             []
         ],
 
@@ -282,6 +342,8 @@ def main():
             [],
 
             # inc+dec
+            [],
+
             []
         ],
 
@@ -294,13 +356,24 @@ def main():
             [],
 
             # inc+dec
+            [],
+
             []
         ]
     ]
 
     point_results = [
+        # base template matching
+        [
+            [],
+            [],
+            [],
+            []
+        ],
         # my_locate_one
         [
+            [],
+
             [],
 
             [],
@@ -317,6 +390,8 @@ def main():
             [],
 
             # inc+dec
+            [],
+
             []
         ],
 
@@ -329,22 +404,24 @@ def main():
             [],
 
             # inc+dec
+            [],
+
             []
         ]
     ]
 
     i = -1
-    for alg in (locate_one, scale_locate_one, keypoint_locate_one):
+    for alg in (base_locate_one, my_locate_one, scale_locate_one, keypoint_locate_one):
         i += 1
         print(f'Stage: {i}')
         for scale_type in range(len(test_data)):
             for percentage in range(len(test_data[scale_type])):
-                p_res=[]
+                p_res = []
                 a_res = []
                 times = []
                 for screenshot in range(len(test_data[scale_type][percentage])):
                     test_screenshot = test_data[scale_type][percentage][screenshot].copy()
-                    
+
                     point_res, time = alg(test_screenshot, 'template.png')
                     p_res.append(point_res)
                     times.append(time)
@@ -354,8 +431,8 @@ def main():
                         # алгоритм не нашел (ошибка 1 рода)
                         accuracy = -1
                     else:
-                        # ВАЖНО!!! если accuracy > 0 значит алгоритм в любом случае попадет по контролу, насколько accuracy близко к 1 не так важно 
-                        accuracy = 1 - math.dist(true_positions[scale_type][percentage][screenshot], point_res) / max_distances[scale_type][percentage][screenshot] 
+                        # ВАЖНО!!! если accuracy > 0 значит алгоритм в любом случае попадет по контролу, насколько accuracy близко к 1 не так важно
+                        accuracy = 1 - math.dist(true_positions[scale_type][percentage][screenshot], point_res) / max_distances[scale_type][percentage][screenshot]
                         # алгоритм промахнулся
                         if accuracy < 0:
                             accuracy = 0
@@ -383,66 +460,94 @@ def main():
 
     # increase table
     worksheet.write(0, 0, '"%" increase')
-    worksheet.write(0, 1, 'my_template_matching')
-    worksheet.write(0, 2, 'multi-scale_template_matching')
-    worksheet.write(0, 3, 'keypoint_matching')
-    worksheet.write(0, 4, 'times')
-    worksheet.write(0, 5, 'my_template_matching')
-    worksheet.write(0, 6, 'multi-scale_template_matching')
-    worksheet.write(0, 7, 'keypoint_matching')
-    
+    worksheet.write(0, 1, 'base_template_matching')
+    worksheet.write(0, 2, 'my_template_matching')
+    worksheet.write(0, 3, 'multi-scale_template_matching')
+    worksheet.write(0, 4, 'keypoint_matching')
+    worksheet.write(0, 5, 'times')
+    worksheet.write(0, 6, 'base_template_matching')
+    worksheet.write(0, 7, 'my_template_matching')
+    worksheet.write(0, 8, 'multi-scale_template_matching')
+    worksheet.write(0, 9, 'keypoint_matching')
+
     row = 0
     for percent in np.linspace(0.05, 0.5, 10):
         p = int(percent*100)
-        row+=1
+        row += 1
         worksheet.write(row, 0, p)
         for col, alg in enumerate(accuracy_results):
             worksheet.write(row, col+1, alg[0][row-1])
         for col, alg in enumerate(time_results):
-            worksheet.write(row, col+5, alg[0][row-1])
+            worksheet.write(row, col+6, alg[0][row-1])
 
     # decrease table
     worksheet.write(11, 0, '"%" decrease')
-    worksheet.write(11, 1, 'my_template_matching')
-    worksheet.write(11, 2, 'multi-scale_template_matching')
-    worksheet.write(11, 3, 'keypoint_matching')
-    worksheet.write(11, 4, 'times')
-    worksheet.write(11, 5, 'my_template_matching')
-    worksheet.write(11, 6, 'multi-scale_template_matching')
-    worksheet.write(11, 7, 'keypoint_matching')
+    worksheet.write(11, 1, 'base_template_matching')
+    worksheet.write(11, 2, 'my_template_matching')
+    worksheet.write(11, 3, 'multi-scale_template_matching')
+    worksheet.write(11, 4, 'keypoint_matching')
+    worksheet.write(11, 5, 'times')
+    worksheet.write(11, 6, 'base_template_matching')
+    worksheet.write(11, 7, 'my_template_matching')
+    worksheet.write(11, 8, 'multi-scale_template_matching')
+    worksheet.write(11, 9, 'keypoint_matching')
 
     row = 11
     for percent in np.linspace(0.05, 0.5, 10):
         p = int(percent*100)
-        row+=1
+        row += 1
         worksheet.write(row, 0, p)
         for col, alg in enumerate(accuracy_results):
             worksheet.write(row, col+1, alg[1][row-12])
         for col, alg in enumerate(time_results):
-            worksheet.write(row, col+5, alg[1][row-12])
+            worksheet.write(row, col+6, alg[1][row-12])
 
     # incdec table
     worksheet.write(22, 0, '"%" incdec')
-    worksheet.write(22, 1, 'my_template_matching')
-    worksheet.write(22, 2, 'multi-scale_template_matching')
-    worksheet.write(22, 3, 'keypoint_matching')
-    worksheet.write(22, 4, 'times')
-    worksheet.write(22, 5, 'my_template_matching')
-    worksheet.write(22, 6, 'multi-scale_template_matching')
-    worksheet.write(22, 7, 'keypoint_matching')
+    worksheet.write(22, 1, 'base_template_matching')
+    worksheet.write(22, 2, 'my_template_matching')
+    worksheet.write(22, 3, 'multi-scale_template_matching')
+    worksheet.write(22, 4, 'keypoint_matching')
+    worksheet.write(22, 5, 'times')
+    worksheet.write(22, 6, 'base_template_matching')
+    worksheet.write(22, 7, 'my_template_matching')
+    worksheet.write(22, 8, 'multi-scale_template_matching')
+    worksheet.write(22, 9, 'keypoint_matching')
 
     row = 22
     for percent in np.linspace(0.05, 0.5, 10):
         p = int(percent*100)
-        row+=1
+        row += 1
         worksheet.write(row, 0, p)
         for col, alg in enumerate(accuracy_results):
             worksheet.write(row, col+1, alg[2][row-23])
         for col, alg in enumerate(time_results):
-            worksheet.write(row, col+5, alg[2][row-23])
+            worksheet.write(row, col+6, alg[2][row-23])
 
-    
+    # proportional table
+    worksheet.write(33, 0, '"%" proportional_resize')
+    worksheet.write(33, 1, 'base_template_matching')
+    worksheet.write(33, 2, 'my_template_matching')
+    worksheet.write(33, 3, 'multi-scale_template_matching')
+    worksheet.write(33, 4, 'keypoint_matching')
+    worksheet.write(33, 5, 'times')
+    worksheet.write(33, 6, 'base_template_matching')
+    worksheet.write(33, 7, 'my_template_matching')
+    worksheet.write(33, 8, 'multi-scale_template_matching')
+    worksheet.write(33, 9, 'keypoint_matching')
+
+    row = 33
+    for percent in np.linspace(0.05, 0.5, 10):
+        p = int(percent*100)
+        row += 1
+        worksheet.write(row, 0, p)
+        for col, alg in enumerate(accuracy_results):
+            worksheet.write(row, col+1, alg[3][row-34])
+        for col, alg in enumerate(time_results):
+            worksheet.write(row, col+6, alg[3][row-34])
+
     workbook.close()
+
 
 if __name__ == "__main__":
     main()
