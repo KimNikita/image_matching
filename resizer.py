@@ -13,6 +13,9 @@ def prepare_test_data(template):
     template = cv.imread(template, cv.IMREAD_GRAYSCALE)
     h, w = template.shape
 
+    screenshot=screenshot[int(s_h//2-1.5*h): int(s_h//2+1.5*h), int(s_w//2-1.5*w): int(s_w//2+1.5*w)]
+    s_h, s_w = screenshot.shape
+
     test_data=[
         #increase
             #percentage_5

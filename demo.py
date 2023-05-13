@@ -200,14 +200,12 @@ def locate_all(template, count, accuracy=0.95, second_try=False, similarity=4):
 
 # MY TEMPLATE MATCHING
 
-def locate_one(template, accuracy=0.95, second_try=False, similarity=4):
+def locate_one(template, accuracy=0.95, second_try=False):
     '''
     template - path to template image of control.\n
     accuracy - the percentage of pixels matching the template image and the one found on the screen. Default 0.95.\n
     second_try - indicates whether to use a different search method based on the similarity score.
     Useful when the size of template image has been changed. Default False.\n
-    similarity - an integer on a five-point scale, sets the minimum similarity of the template image and the one found on the screen.
-    Used with second_try=True. Default 4.\n
     Second search method works better in cases when the size of the template image has been increased.
     Function returns rectangle coordinates (upper_left_x, upper_left_y, lower_right_x, lower_right_y) of found control.
     Size of rectangle are equal to template image size.
@@ -232,10 +230,6 @@ def locate_one(template, accuracy=0.95, second_try=False, similarity=4):
     # Apply template Matching
     res = cv.matchTemplate(screenshot, template, cv.TM_CCOEFF_NORMED)
 
-    if similarity <= 0:
-        similarity = 1
-    similarity = similarity/100-0.001
-
     _, max_value, _, max_location = cv.minMaxLoc(res)
     w, h = template.shape[::-1]
     box = (-1, -1, -1, -1)
@@ -254,30 +248,31 @@ def locate_one(template, accuracy=0.95, second_try=False, similarity=4):
                      (max_location[0] + w, max_location[1] + h), (0, 0, 255), 2)
 
     elif second_try:
-        # Getting each value in format 0.00
-        val00 = round(res[max_location[1]-1][max_location[0]-1], 2)
-        val01 = round(res[max_location[1]][max_location[0]-1], 2)
-        val02 = round(res[max_location[1]+1][max_location[0]-1], 2)
+        # коэффициент 0.02 получен экспериментально
+        similarity = accuracy * 0.02
 
-        val10 = round(res[max_location[1]-1][max_location[0]], 2)
-        val12 = round(res[max_location[1]+1][max_location[0]], 2)
+        val00 = res[max_location[1]-1][max_location[0]-1]
+        val10 = res[max_location[1]][max_location[0]-1]
+        val20 = res[max_location[1]+1][max_location[0]-1]
 
-        val20 = round(res[max_location[1]-1][max_location[0]+1], 2)
-        val21 = round(res[max_location[1]][max_location[0]+1], 2)
-        val22 = round(res[max_location[1]+1][max_location[0]+1], 2)
+        val01 = res[max_location[1]-1][max_location[0]]
+        val21 = res[max_location[1]+1][max_location[0]]
 
-        # TODO fix validation
+        val02 = res[max_location[1]-1][max_location[0]+1]
+        val12 = res[max_location[1]][max_location[0]+1]
+        val22 = res[max_location[1]+1][max_location[0]+1]
+
         # Make sure that vertical and horizontal values way bigger than in the corners
         valid_score = 0
-        if abs(val01-val00)+abs(val01-val02) >= similarity:
+        if val10 - (val00+val20)/2 >= similarity:
             valid_score += 1
-        if abs(val10-val00)+abs(val10-val20) >= similarity:
+        if val01 - (val00+val02)/2 >= similarity:
             valid_score += 1
-        if abs(val21-val20)+abs(val21-val22) >= similarity:
+        if val21 - (val20+val22)/2 >= similarity:
             valid_score += 1
-        if abs(val12-val02)+abs(val12-val22) >= similarity:
-            valid_score += 1    
-        
+        if val12 - (val02+val22)/2 >= similarity:
+            valid_score += 1
+
         if valid_score >= 2:
             box = (max_location[0], max_location[1],
                    max_location[0] + w, max_location[1] + h)
@@ -318,7 +313,8 @@ def scale_locate_one(template, accuracy=0.95):
 
     (h, w) = template.shape[:2]
     found_dec = (0, 0, 0)
-    mean_acc=([], [])
+    prev_max= [0, 0]
+    next_min= [0, 0]
     # decrease
     # loop over the scales of the image
     for scale in np.linspace(0.2, 1.0, 20)[::-1]:
@@ -339,9 +335,10 @@ def scale_locate_one(template, accuracy=0.95):
         # if we have found a new maximum correlation value, then update
         # the bookkeeping variable
         if maxVal > found_dec[0]:
-            mean_acc[0].append(found_dec[0])
+            prev_max[0] = found_dec[0]
             found_dec = (maxVal, maxLoc, r)
         else:
+            next_min[0]=maxVal
             break
 
     # DEBUG
@@ -358,24 +355,26 @@ def scale_locate_one(template, accuracy=0.95):
         # DEBUG
         print(maxVal)
         if maxVal > found_inc[0]:
-            mean_acc[1].append(found_inc[0])
+            prev_max[1]=found_inc[0]
             found_inc = (maxVal, maxLoc, r)
         else:
+            next_min[1]=maxVal
             break
 
-    validation = 0
+    i = 0
     if found_dec[0] > found_inc[0]:
-        validation=np.mean(mean_acc[0])
         (maxVal, maxLoc, r) = found_dec
     else:
-        validation=np.mean(mean_acc[1])
+        i=1
         (maxVal, maxLoc, r) = found_inc
-    # TODO fix validation
-    # print(validation, maxVal)
-    if maxVal < validation + 0.02 * accuracy:
-        return (-1, -1)
+
+    if next_min[i]==0:
+        next_min[i]=prev_max[i]
+    # коэффициент 0.01 получен экспериментально
+    if maxVal - (prev_max[i]+next_min[i])/2 < 0.01 * accuracy:
+        return (-1, -1, -1, -1)
     (startX, startY) = (int(maxLoc[0] * r), int(maxLoc[1] * r))
-    (endX, endY) = (int((maxLoc[0] + w) * r), int((maxLoc[1] + h) * r))
+    (endX, endY) = (int(maxLoc[0] * r + w), int(maxLoc[1]  * r +h))
 
     # DEBUG
     print()
@@ -430,7 +429,10 @@ def keypoint_locate_one(template, accuracy=0.95):
     If they are not, then the keypoint is eliminated and will not be used for further calculations.
     https://docs.opencv.org/3.4/d5/d6f/tutorial_feature_flann_matcher.html#:~:text=To%20filter%20the%20matches%2C%20Lowe,value%20is%20below%20a%20threshold.
     '''
-    for m, n in matches:
+    for pair in matches:
+        if len(pair) < 2:
+            continue
+        m, n = pair
         if m.distance < (0.7 + (1-accuracy)*0.3)*n.distance:
             best_matches.append(m)
             # DEBUG
