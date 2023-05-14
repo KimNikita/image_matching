@@ -2,9 +2,10 @@
 import cv2 as cv
 import numpy as np
 from PIL import ImageGrab
-from resizer import prepare_test_data
+from resizer import prepare_test_data_0, prepare_test_data_1, prepare_test_data_2, prepare_test_data_3
 import math
 import timeit
+import operator
 
 # multi scale
 import imutils
@@ -18,6 +19,7 @@ def timing(f):
         return result, ellapsed_time
     return wrapper
 
+# ------------------- LOCATE ONE ------------------------
 
 # BASE TEMPLATE MATCHING
 @timing
@@ -64,7 +66,7 @@ def my_locate_one(screenshot, template, accuracy=0.95, second_try=True):
 
     _, max_value, _, max_location = cv.minMaxLoc(res)
 
-    w, h = template.shape[::-1]
+    h, w = template.shape
 
     x, y = -1, -1
 
@@ -117,7 +119,7 @@ def scale_locate_one(screenshot, template, accuracy=0.95):
         print('Invalid format of image')
         return None
 
-    (h, w) = template.shape[:2]
+    h, w = template.shape
     found_dec = (0, 0, 0)
     prev_max= [0, 0]
     next_min= [0, 0]
@@ -246,9 +248,233 @@ def keypoint_locate_one(screenshot, template, accuracy=0.95):
     return (x, y)
 
 
-def main():
-    test_data, true_positions, max_distances = prepare_test_data(
-        'template.png')
+# ------------------- LOCATE All ------------------------
+
+@timing
+def my_locate_all(screenshot, template, accuracy=0.95, second_try=True):
+    if isinstance(template, str):
+        template = cv.imread(template, cv.IMREAD_GRAYSCALE)
+        if template is None:
+            print('Cannot read image, check cv2.imread() documentation')
+            return None
+    else:
+        print('Invalid format of image')
+        return None
+
+    points=[]
+    height, width = screenshot.shape
+    for i in range(5):
+        # Apply template Matching
+        res = cv.matchTemplate(screenshot, template, cv.TM_CCOEFF_NORMED)
+
+        _, max_value, _, max_location = cv.minMaxLoc(res)
+
+        h, w = template.shape
+
+        x, y = -1, -1
+
+        if max_value >= accuracy:
+            x = max_location[0] + w//2
+            y = max_location[1] + h//2
+        elif second_try:
+            # коэффициент 0.02 получен экспериментально
+            similarity = accuracy * 0.02
+
+            val00 = res[max_location[1]-1][max_location[0]-1]
+            val10 = res[max_location[1]][max_location[0]-1]
+            val20 = res[max_location[1]+1][max_location[0]-1]
+
+            val01 = res[max_location[1]-1][max_location[0]]
+            val21 = res[max_location[1]+1][max_location[0]]
+
+            val02 = res[max_location[1]-1][max_location[0]+1]
+            val12 = res[max_location[1]][max_location[0]+1]
+            val22 = res[max_location[1]+1][max_location[0]+1]
+
+            # Make sure that vertical and horizontal values way bigger than in the corners
+            valid_score = 0
+            if val10 - (val00+val20)/2 >= similarity:
+                valid_score += 1
+            if val01 - (val00+val02)/2 >= similarity:
+                valid_score += 1
+            if val21 - (val20+val22)/2 >= similarity:
+                valid_score += 1
+            if val12 - (val02+val22)/2 >= similarity:
+                valid_score += 1
+
+            if valid_score >= 2:
+                x = max_location[0] + w//2
+                y = max_location[1] + h//2
+        
+        points.append((x, y))
+
+        if x != -1 and y != -1:
+            for i in range(0, h):
+                for j in range(0, w):
+                    if 0 <= max_location[1]+i < height and 0 <= max_location[0]+j < width:
+                        screenshot[max_location[1]+i][max_location[0]+j] = 0
+
+    return points
+
+# MULTI SCALE TEMPLATE MATCHING
+
+
+@timing
+def scale_locate_all(screenshot, template, accuracy=0.95):
+    if isinstance(template, str):
+        template = cv.imread(template, cv.IMREAD_GRAYSCALE)
+        if template is None:
+            print('Cannot read image, check cv2.imread() documentation')
+            return None
+    else:
+        print('Invalid format of image')
+        return None
+
+    h, w = template.shape
+    points=[]
+    height, width = screenshot.shape
+    for j in range(5):
+        found_dec = (0, 0, 0)
+        prev_max= [0, 0]
+        next_min= [0, 0]
+        # decrease
+        for scale in np.linspace(0.2, 1.0, 20)[::-1]:
+            resized = imutils.resize(
+                screenshot, width=int(screenshot.shape[1] * scale))
+            r = screenshot.shape[1] / float(resized.shape[1])
+
+            if resized.shape[0] < h or resized.shape[1] < w:
+                break
+
+            result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
+            (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
+
+            if maxVal > found_dec[0]:
+                prev_max[0] = found_dec[0]
+                found_dec = (maxVal, maxLoc, r)
+            else:
+                next_min[0]=maxVal
+                break
+
+        # increase
+        found_inc = (0, 0, 0)
+        for scale in np.linspace(0.2, 1.0, 20):
+            resized = imutils.resize(
+                screenshot, width=int(screenshot.shape[1] * (1+scale)))
+            r = screenshot.shape[1] / float(resized.shape[1])
+
+            result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
+            (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
+
+            if maxVal > found_inc[0]:
+                prev_max[1]=found_inc[0]
+                found_inc = (maxVal, maxLoc, r)
+            else:
+                next_min[1]=maxVal
+                break
+
+        i = 0
+        if found_dec[0] > found_inc[0]:
+            (maxVal, maxLoc, r) = found_dec
+        else:
+            i=1
+            (maxVal, maxLoc, r) = found_inc
+        
+        if next_min[i]==0:
+            next_min[i]=prev_max[i]
+        # коэффициент 0.01 получен экспериментально
+        if maxVal - (prev_max[i]+next_min[i])/2 < 0.01 * accuracy:
+            points.append((-1, -1))
+            continue
+
+        x, y = int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2
+        points.append((x, y))
+
+        for i in range(0, h):
+            for j in range(0, w):
+                if 0 <= int(maxLoc[1] * r)+i < height and 0 <= int(maxLoc[0] * r)+j < width:
+                    screenshot[int(maxLoc[1] * r)+i][int(maxLoc[0] * r)+j] = 0
+
+    return points
+
+# KEYPOINT MATCHING
+
+
+@timing
+def keypoint_locate_all(screenshot, template, accuracy=0.95):
+    # TODO apply clasterization
+    return [(-1, -1), (-1, -1), (-1, -1), (-1, -1), (-1, -1)]
+
+    if isinstance(template, str):
+        template = cv.imread(template, cv.IMREAD_GRAYSCALE)
+        if template is None:
+            print('Cannot read image, check cv2.imread() documentation')
+            return None
+    else:
+        print('Invalid format of image')
+        return None
+
+    w, h = template.shape[::-1]
+
+    # Initiate SIFT detector
+    sift = cv.SIFT_create()
+
+    # find the keypoints and descriptors with SIFT
+    kp1, des1 = sift.detectAndCompute(template, None)
+    kp2, des2 = sift.detectAndCompute(screenshot, None)
+
+    # BFMatcher
+    best_matches = []
+
+    bf = cv.BFMatcher(cv.NORM_L2, crossCheck=False)
+    matches = bf.knnMatch(des1, des2, k=2)
+    '''
+    Short version: each keypoint of the first image is matched with a number of keypoints from the second image.
+    We keep the 2 best matches for each keypoint (best matches = the ones with the smallest distance measurement).
+    Lowe's test checks that the two distances are sufficiently different.
+    If they are not, then the keypoint is eliminated and will not be used for further calculations.
+    https://docs.opencv.org/3.4/d5/d6f/tutorial_feature_flann_matcher.html#:~:text=To%20filter%20the%20matches%2C%20Lowe,value%20is%20below%20a%20threshold.
+    '''
+   
+    for pair in matches:
+        if len(pair) < 2:
+            continue
+        m, n = pair
+        if m.distance < (0.7 + (1-accuracy)*0.3)*n.distance:
+            best_matches.append(m)
+
+    # Initialize lists
+    list_x = []
+    list_y = []
+    x, y = -1, -1
+
+    # For each match...
+    for mat in best_matches:
+        # Get the matching keypoints for screenshot
+        screenshot_idx = mat.trainIdx
+
+        # i - columns
+        # j - rows
+        # Get the coordinates
+        (i, j) = kp2[screenshot_idx].pt
+
+        # Append to each list
+        list_x.append(i)
+        list_y.append(j)
+
+    if len(list_x) < 1 or len(list_y) < 1:
+        return (x, y)
+    elif len(list_x) > 9 and len(list_y) > 9:
+        x, y = np.mean(sorted(list_x)[math.ceil(0.1 * len(list_x)): math.ceil(-0.1 * len(list_x))]), np.mean(sorted(list_y)[math.ceil(0.1 * len(list_y)): math.ceil(-0.1 * len(list_y))])
+    else:
+        x, y = np.mean(list_x), np.mean(list_y)
+
+    return (x, y)
+
+
+# percentage distribution
+def test_0():
+    test_data, true_positions, max_distances = prepare_test_data_0('template.png')
 
     accuracy_results = [
         # base template matching
@@ -262,13 +488,13 @@ def main():
         # my_locate_one
         [
             # increase
-            # percentage_5
-            # mean accuracy
-            # percentage_10
-            # mean accuracy
-            # ..................
-            # percentage_50
-            # mean accuracy
+                # percentage_5
+                    # mean accuracy
+                # percentage_10
+                    # mean accuracy
+                # ..................
+                # percentage_50
+                    # mean accuracy
             [],
 
             # decrease
@@ -460,7 +686,7 @@ def main():
 
     import xlsxwriter
 
-    workbook = xlsxwriter.Workbook('results.xlsx')
+    workbook = xlsxwriter.Workbook('results_of_test_0.xlsx')
     worksheet = workbook.add_worksheet()
 
     # increase table
@@ -552,6 +778,223 @@ def main():
             worksheet.write(row, col+6, alg[3][row-34])
 
     workbook.close()
+
+# finding position of control
+def test_1():
+    test_data, true_positions, max_distances = prepare_test_data_1('template.png')
+
+    accuracy_results = [
+        # my_locate_one
+        [],
+
+        # scale_locate_one
+        [],
+
+        # keypoint_locate_one
+        []
+    ]
+
+    time_results = [
+        # my_locate_one
+        [],
+
+        # scale_locate_one
+        [],
+
+        # keypoint_locate_one
+        []
+    ]
+
+    i = -1
+    for alg in (my_locate_one, scale_locate_one, keypoint_locate_one):
+        i += 1
+        print(f'Stage: {i}')
+        for screenshot in range(len(test_data)):
+            test_screenshot = test_data[screenshot].copy()
+            point_res, time = alg(test_screenshot, 'template.png')
+            time_results[i].append(time)
+
+            accuracy = 1
+            if point_res[0] < 0 or point_res[1] < 0:
+                # алгоритм не нашел (ошибка 1 рода)
+                accuracy = -1
+            else:
+                # ВАЖНО!!! если accuracy > 0 значит алгоритм в любом случае попадет по контролу, насколько accuracy близко к 1 не так важно
+                accuracy = 1 - math.dist(true_positions[screenshot], point_res) / max_distances[screenshot]
+                # алгоритм промахнулся
+                if accuracy < 0:
+                    accuracy = 0
+            accuracy_results[i].append(accuracy)
+
+    import xlsxwriter
+
+    workbook = xlsxwriter.Workbook('results_of_test_1.xlsx')
+    worksheet = workbook.add_worksheet()
+
+    worksheet.write(0, 1, 'my_template_matching')
+    worksheet.write(0, 2, 'multi-scale_template_matching')
+    worksheet.write(0, 3, 'keypoint_matching')
+
+    worksheet.write(1, 0, 'Mean accuracy')
+    worksheet.write(2, 0, 'Mean time')
+
+
+    for col, alg in enumerate(accuracy_results):
+        worksheet.write(1, col+1, np.mean(alg))
+
+    for col, alg in enumerate(time_results):
+        worksheet.write(2, col+1, np.mean(alg))
+
+    workbook.close()
+
+# finding positions of multiple controls
+def test_2():
+    test_data, true_positions, max_distances = prepare_test_data_2('template.png')
+
+    accuracy_results = [
+        # my_locate_one
+        [],
+
+        # scale_locate_one
+        [],
+
+        # keypoint_locate_one
+        []
+    ]
+
+    time_results = [
+        # my_locate_one
+        [],
+
+        # scale_locate_one
+        [],
+
+        # keypoint_locate_one
+        []
+    ]
+    
+    i = -1
+    for alg in (my_locate_all, scale_locate_all, keypoint_locate_all):
+        i += 1
+        print(f'Stage: {i}')
+        for screenshot in range(len(test_data)):
+            test_screenshot = test_data[screenshot].copy()
+            points, time = alg(test_screenshot, 'template.png')
+
+            time_results[i].append(time)
+            points.sort(key=operator.itemgetter(1, 0))
+
+            mean_accuracy=[]
+            for j in range(5):
+                accuracy = 1
+                if points[j][0] < 0 or points[j][1] < 0:
+                    # алгоритм не нашел (ошибка 1 рода)
+                    accuracy = -1
+                else:
+                    # ВАЖНО!!! если accuracy > 0 значит алгоритм в любом случае попадет по контролу, насколько accuracy близко к 1 не так важно
+                    accuracy = 1 - math.dist(true_positions[screenshot][j], points[j]) / max_distances[screenshot][j]
+                    # алгоритм промахнулся
+                    if accuracy < 0:
+                        accuracy = 0
+                mean_accuracy.append(accuracy)
+            accuracy_results[i].append(np.mean(mean_accuracy))
+
+    import xlsxwriter
+
+    workbook = xlsxwriter.Workbook('results_of_test_2.xlsx')
+    worksheet = workbook.add_worksheet()
+
+    worksheet.write(0, 1, 'my_template_matching')
+    worksheet.write(0, 2, 'multi-scale_template_matching')
+    worksheet.write(0, 3, 'keypoint_matching')
+
+    worksheet.write(1, 0, 'Mean accuracy')
+    worksheet.write(2, 0, 'Mean time')
+
+
+    for col, alg in enumerate(accuracy_results):
+        worksheet.write(1, col+1, np.mean(alg))
+
+    for col, alg in enumerate(time_results):
+        worksheet.write(2, col+1, np.mean(alg))
+
+    workbook.close()
+
+# confirming absence of control
+def test_3():
+    test_data = prepare_test_data_3('template.png')
+
+    accuracy_results = [
+        # my_locate_one
+        [],
+
+        # scale_locate_one
+        [],
+
+        # keypoint_locate_one
+        []
+    ]
+
+    time_results = [
+        # my_locate_one
+        [],
+
+        # scale_locate_one
+        [],
+
+        # keypoint_locate_one
+        []
+    ]
+
+
+    i = -1
+    for alg in (my_locate_one, scale_locate_one, keypoint_locate_one):
+        i += 1
+        print(f'Stage: {i}')
+        for screenshot in range(len(test_data)):
+            test_screenshot = test_data[screenshot].copy()
+            point_res, time = alg(test_screenshot, 'template.png')
+            time_results[i].append(time)
+
+            if point_res[0] < 0 or point_res[1] < 0:
+                accuracy_results[i].append(1)
+            else:
+                accuracy_results[i].append(-1)
+
+    import xlsxwriter
+
+    workbook = xlsxwriter.Workbook('results_of_test_3.xlsx')
+    worksheet = workbook.add_worksheet()
+
+    worksheet.write(0, 1, 'my_template_matching')
+    worksheet.write(0, 2, 'multi-scale_template_matching')
+    worksheet.write(0, 3, 'keypoint_matching')
+
+    worksheet.write(1, 0, 'Mean accuracy')
+    worksheet.write(2, 0, 'Mean time')
+
+
+    for col, alg in enumerate(accuracy_results):
+        worksheet.write(1, col+1, np.mean(alg))
+
+    for col, alg in enumerate(time_results):
+        worksheet.write(2, col+1, np.mean(alg))
+
+    workbook.close()
+    
+
+def main():
+    print('---------------------------TEST 0---------------------------')
+    test_0()
+
+    print('---------------------------TEST 1---------------------------')
+    test_1()
+
+    print('---------------------------TEST 2---------------------------')
+    test_2()
+
+    print('---------------------------TEST 3---------------------------')
+    test_3()
 
 
 if __name__ == "__main__":

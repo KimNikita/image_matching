@@ -114,6 +114,7 @@ def by_image(self, template, accuracy=0.95, second_try=False, similarity=4):
     plt.title('Detected Point'), plt.xticks([]), plt.yticks([])
     plt.show()
 
+# TODO if cannot find at some step -> stop and return
 def locate_all(template, count, accuracy=0.95, second_try=False, similarity=4):
     '''
     template - path to template image of control.\n
@@ -149,7 +150,7 @@ def locate_all(template, count, accuracy=0.95, second_try=False, similarity=4):
     similarity = similarity/100-0.001
 
     height, width = screenshot.shape
-    w, h = template.shape[::-1]
+    h, w = template.shape
     boxes = []
     for i in range(0, count):
         # Apply template Matching
@@ -184,6 +185,7 @@ def locate_all(template, count, accuracy=0.95, second_try=False, similarity=4):
                 boxes.append(
                     (max_location[0], max_location[1], max_location[0] + w, max_location[1] + h))
 
+        # TODO how to fill screenshot? opposite color?
         for i in range(0, h):
             for j in range(0, w):
                 if 0 <= max_location[1]+i < height and 0 <= max_location[0]+j < width:
@@ -231,7 +233,7 @@ def locate_one(template, accuracy=0.95, second_try=False):
     res = cv.matchTemplate(screenshot, template, cv.TM_CCOEFF_NORMED)
 
     _, max_value, _, max_location = cv.minMaxLoc(res)
-    w, h = template.shape[::-1]
+    h, w = template.shape
     box = (-1, -1, -1, -1)
 
     # DEBUG
@@ -311,7 +313,7 @@ def scale_locate_one(template, accuracy=0.95):
         print('Invalid format of image')
         return None
 
-    (h, w) = template.shape[:2]
+    h, w = template.shape
     found_dec = (0, 0, 0)
     prev_max= [0, 0]
     next_min= [0, 0]
