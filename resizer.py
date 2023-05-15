@@ -214,7 +214,7 @@ def prepare_test_data_2(template):
     template = cv.imread(template, cv.IMREAD_GRAYSCALE)
     h, w = template.shape
 
-    screenshot = screenshot[int(s_h//2-3*h): int(s_h//2+3*h), int(s_w//2-4*w): int(s_w//2+4*w)]
+    screenshot = screenshot[int(s_h//2-3*h): int(s_h//2+3*h), int(s_w//2-3*w): int(s_w//2+3*w)]
     s_h, s_w = screenshot.shape
 
     test_data = []
@@ -236,7 +236,6 @@ def prepare_test_data_2(template):
         scales.append((int(w*(1-percent)), int(h*(1+percent))))
 
     random.shuffle(scales)
-
     for scale in range(0, len(scales)//2-4, 5):
         resized_all=[]
         dists=[]
@@ -333,7 +332,7 @@ def prepare_test_data_3(template):
 def prepare_resized_data(template, inc_path, dec_path, inc_dec_path, proportional_path):
     template = cv.imread(template, cv.IMREAD_GRAYSCALE)
     h, w = template.shape
-    data_path=(inc_path, dec_path, inc_dec_path)
+    data_path=(inc_path, dec_path, inc_dec_path, proportional_path)
 
     for percent in np.linspace(0.05, 0.5, 10):
         scales = (((int(w*(1+percent)), h), (w, int(h*(1+percent))), (int(w*(1+percent)), int(h*(1+percent)))),

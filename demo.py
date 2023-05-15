@@ -483,13 +483,88 @@ def keypoint_locate_one(template, accuracy=0.95):
 
     return box
 
+def keypoint_locate_all(screenshot, template, count, accuracy=0.95):
+    import numpy as np
+    import cv2 as cv
+    from sklearn.cluster import KMeans
+
+    screenshot = cv.imread(screenshot, cv.IMREAD_GRAYSCALE)
+
+    if isinstance(template, str):
+        template = cv.imread(template, cv.IMREAD_GRAYSCALE)
+        if template is None:
+            print('Cannot read image, check cv2.imread() documentation')
+            return None
+    else:
+        print('Invalid format of image')
+        return None
+
+    w, h = template.shape[::-1]
+
+    # Initiate SIFT detector
+    sift = cv.SIFT_create()
+
+    # find the keypoints and descriptors with SIFT
+    kp1, des1 = sift.detectAndCompute(template, None)
+    kp2, des2 = sift.detectAndCompute(screenshot, None)
+
+    # BFMatcher
+    best_matches = []
+
+    bf = cv.BFMatcher(cv.NORM_L2, crossCheck=False)
+    matches = bf.knnMatch(des1, des2, k=count+1)
+    '''
+    Short version: each keypoint of the first image is matched with a number of keypoints from the second image.
+    We keep the 2 best matches for each keypoint (best matches = the ones with the smallest distance measurement).
+    Lowe's test checks that the two distances are sufficiently different.
+    If they are not, then the keypoint is eliminated and will not be used for further calculations.
+    https://docs.opencv.org/3.4/d5/d6f/tutorial_feature_flann_matcher.html#:~:text=To%20filter%20the%20matches%2C%20Lowe,value%20is%20below%20a%20threshold.
+    '''
+   
+    for points in matches:
+        if len(points)<count+1:
+            continue
+        for i in range(count):
+            if points[i].distance < (0.7 + (1-accuracy)*0.3)*points[count].distance:
+                best_matches.append(points[i])
+
+    # Initialize list
+    points=[]
+
+    # For each match...
+    for mat in best_matches:
+        # Get the matching keypoints for screenshot
+        screenshot_idx = mat.trainIdx
+
+        # i - columns
+        # j - rows
+        # Get the coordinates
+        (i, j) = kp2[screenshot_idx].pt
+
+        points.append([i, j])
+
+    clusters = KMeans(n_clusters=count, n_init="auto").fit(points)
+
+    positions = clusters.cluster_centers_
+
+    for pos in positions:
+        box = (int(pos[0] - w//2), int(pos[1] - h//2),
+               int(pos[0] + w//2), int(pos[1] + h//2))
+        cv.rectangle(screenshot, (box[0], box[1]),
+                    (box[2], box[3]), (0, 0, 255), 2)
+    cv.imshow("Result", screenshot)
+    cv.waitKey(0)
+
+    return positions
+
 
 def main():
     # by_image(None, 'template.png', second_try=True)
     # result = locate_all('template.png', 5, second_try=True)
     # result = locate_one('template.png', second_try=True)
     # result = scale_locate_one('template.png')
-    result = keypoint_locate_one('template.png')
+    # result = keypoint_locate_one('template.png')
+    result = keypoint_locate_all('test2.png','template.PNG', 5)
     print(result)
 
 

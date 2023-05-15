@@ -1,4 +1,4 @@
-# Base
+# all
 import cv2 as cv
 import numpy as np
 from PIL import ImageGrab
@@ -10,6 +10,8 @@ import operator
 # multi scale
 import imutils
 
+# keypoint
+from sklearn.cluster import KMeans
 
 def timing(f):
     def wrapper(screenshot, template):
@@ -73,7 +75,7 @@ def my_locate_one(screenshot, template, accuracy=0.95, second_try=True):
     if max_value >= accuracy:
         x = max_location[0] + w//2
         y = max_location[1] + h//2
-    elif second_try:
+    elif second_try and max_location[1]-1>=0 and max_location[0]-1>=0 and max_location[1]+1<res.shape[0] and max_location[0]+1<res.shape[1]:
         # коэффициент 0.02 получен экспериментально
         similarity = accuracy * 0.02
 
@@ -199,6 +201,9 @@ def keypoint_locate_one(screenshot, template, accuracy=0.95):
     kp1, des1 = sift.detectAndCompute(template, None)
     kp2, des2 = sift.detectAndCompute(screenshot, None)
 
+    if des1 is None or des2 is None:
+        return (-1, -1)
+
     # BFMatcher
     best_matches = []
 
@@ -218,6 +223,9 @@ def keypoint_locate_one(screenshot, template, accuracy=0.95):
         m, n = pair
         if m.distance < (0.7 + (1-accuracy)*0.3)*n.distance:
             best_matches.append(m)
+
+    if len(best_matches)==0:
+        return (-1, -1)
 
     # Initialize lists
     list_x = []
@@ -402,9 +410,6 @@ def scale_locate_all(screenshot, template, accuracy=0.95):
 
 @timing
 def keypoint_locate_all(screenshot, template, accuracy=0.95):
-    # TODO apply clasterization
-    return [(-1, -1), (-1, -1), (-1, -1), (-1, -1), (-1, -1)]
-
     if isinstance(template, str):
         template = cv.imread(template, cv.IMREAD_GRAYSCALE)
         if template is None:
@@ -423,11 +428,14 @@ def keypoint_locate_all(screenshot, template, accuracy=0.95):
     kp1, des1 = sift.detectAndCompute(template, None)
     kp2, des2 = sift.detectAndCompute(screenshot, None)
 
+    if des1 is None or des2 is None:
+        return [(-1, -1), (-1, -1), (-1, -1), (-1, -1), (-1, -1)]
+
     # BFMatcher
     best_matches = []
 
     bf = cv.BFMatcher(cv.NORM_L2, crossCheck=False)
-    matches = bf.knnMatch(des1, des2, k=2)
+    matches = bf.knnMatch(des1, des2, k=6)
     '''
     Short version: each keypoint of the first image is matched with a number of keypoints from the second image.
     We keep the 2 best matches for each keypoint (best matches = the ones with the smallest distance measurement).
@@ -436,40 +444,37 @@ def keypoint_locate_all(screenshot, template, accuracy=0.95):
     https://docs.opencv.org/3.4/d5/d6f/tutorial_feature_flann_matcher.html#:~:text=To%20filter%20the%20matches%2C%20Lowe,value%20is%20below%20a%20threshold.
     '''
    
-    for pair in matches:
-        if len(pair) < 2:
+    for points in matches:
+        if len(points)<6:
             continue
-        m, n = pair
-        if m.distance < (0.7 + (1-accuracy)*0.3)*n.distance:
-            best_matches.append(m)
+        for i in range(5):
+            if points[i].distance < (0.7 + (1-accuracy)*0.3)*points[5].distance:
+                best_matches.append(points[i])
 
-    # Initialize lists
-    list_x = []
-    list_y = []
-    x, y = -1, -1
+    if len(best_matches)==0:
+        return [(-1, -1), (-1, -1), (-1, -1), (-1, -1), (-1, -1)]
 
+    points=[]
     # For each match...
     for mat in best_matches:
         # Get the matching keypoints for screenshot
         screenshot_idx = mat.trainIdx
 
-        # i - columns
-        # j - rows
+        # x - columns
+        # y - rows
         # Get the coordinates
-        (i, j) = kp2[screenshot_idx].pt
+        (x, y) = kp2[screenshot_idx].pt
 
         # Append to each list
-        list_x.append(i)
-        list_y.append(j)
+        points.append([x, y])
 
-    if len(list_x) < 1 or len(list_y) < 1:
-        return (x, y)
-    elif len(list_x) > 9 and len(list_y) > 9:
-        x, y = np.mean(sorted(list_x)[math.ceil(0.1 * len(list_x)): math.ceil(-0.1 * len(list_x))]), np.mean(sorted(list_y)[math.ceil(0.1 * len(list_y)): math.ceil(-0.1 * len(list_y))])
-    else:
-        x, y = np.mean(list_x), np.mean(list_y)
+    clusters = KMeans(n_clusters=min(5, len(points)), n_init="auto").fit(points)
 
-    return (x, y)
+    points=[]
+    for point in clusters.cluster_centers_:
+        points.append((point[0], point[1]))
+
+    return points
 
 
 # percentage distribution
@@ -660,7 +665,7 @@ def test_0():
                     accuracy = 1
                     if point_res[0] < 0 or point_res[1] < 0:
                         # алгоритм не нашел (ошибка 1 рода)
-                        accuracy = -1
+                        accuracy = 0
                     else:
                         # ВАЖНО!!! если accuracy > 0 значит алгоритм в любом случае попадет по контролу, насколько accuracy близко к 1 не так важно
                         accuracy = 1 - math.dist(true_positions[scale_type][percentage][screenshot], point_res) / max_distances[scale_type][percentage][screenshot]
@@ -817,7 +822,7 @@ def test_1():
             accuracy = 1
             if point_res[0] < 0 or point_res[1] < 0:
                 # алгоритм не нашел (ошибка 1 рода)
-                accuracy = -1
+                accuracy = 0
             else:
                 # ВАЖНО!!! если accuracy > 0 значит алгоритм в любом случае попадет по контролу, насколько accuracy близко к 1 не так важно
                 accuracy = 1 - math.dist(true_positions[screenshot], point_res) / max_distances[screenshot]
@@ -882,21 +887,22 @@ def test_2():
             points, time = alg(test_screenshot, 'template.png')
 
             time_results[i].append(time)
-            points.sort(key=operator.itemgetter(1, 0))
 
             mean_accuracy=[]
-            for j in range(5):
-                accuracy = 1
+            for j in range(min(5, len(points))):
+                best_match_accuracy = 1
                 if points[j][0] < 0 or points[j][1] < 0:
                     # алгоритм не нашел (ошибка 1 рода)
-                    accuracy = -1
+                    best_match_accuracy = 0
                 else:
-                    # ВАЖНО!!! если accuracy > 0 значит алгоритм в любом случае попадет по контролу, насколько accuracy близко к 1 не так важно
-                    accuracy = 1 - math.dist(true_positions[screenshot][j], points[j]) / max_distances[screenshot][j]
-                    # алгоритм промахнулся
-                    if accuracy < 0:
-                        accuracy = 0
-                mean_accuracy.append(accuracy)
+                    best_match_accuracy = 0
+                    for k in range(5):
+                        # ВАЖНО!!! если accuracy > 0 значит алгоритм в любом случае попадет по контролу, насколько accuracy близко к 1 не так важно
+                        accuracy = 1 - math.dist(true_positions[screenshot][k], points[j]) / max_distances[screenshot][k]
+                        # алгоритм промахнулся
+                        if accuracy > best_match_accuracy:
+                            best_match_accuracy = accuracy
+                mean_accuracy.append(best_match_accuracy)
             accuracy_results[i].append(np.mean(mean_accuracy))
 
     import xlsxwriter
@@ -959,7 +965,7 @@ def test_3():
             if point_res[0] < 0 or point_res[1] < 0:
                 accuracy_results[i].append(1)
             else:
-                accuracy_results[i].append(-1)
+                accuracy_results[i].append(0)
 
     import xlsxwriter
 
@@ -984,8 +990,8 @@ def test_3():
     
 
 def main():
-    print('---------------------------TEST 0---------------------------')
-    test_0()
+    #print('---------------------------TEST 0---------------------------')
+    #test_0()
 
     print('---------------------------TEST 1---------------------------')
     test_1()
