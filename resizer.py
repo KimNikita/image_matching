@@ -214,7 +214,7 @@ def prepare_test_data_2(template):
     template = cv.imread(template, cv.IMREAD_GRAYSCALE)
     h, w = template.shape
 
-    screenshot = screenshot[int(s_h//2-3*h): int(s_h//2+3*h), int(s_w//2-3*w): int(s_w//2+3*w)]
+    screenshot = screenshot[max(0,int(s_h//2-3*h)): min(s_h,int(s_h//2+4*h)), max(0,int(s_w//2-4*w)): min(s_w,int(s_w//2+4*w))]
     s_h, s_w = screenshot.shape
 
     test_data = []
