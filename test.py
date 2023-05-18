@@ -59,9 +59,6 @@ def my_locate_one(screenshot, template, accuracy=0.95, second_try=True):
         if template is None:
             print('Cannot read image, check cv2.imread() documentation')
             return None
-    else:
-        print('Invalid format of image')
-        return None
 
     # Apply template Matching
     res = cv.matchTemplate(screenshot, template, cv.TM_CCOEFF_NORMED)
@@ -117,9 +114,6 @@ def scale_locate_one(screenshot, template, accuracy=0.95):
         if template is None:
             print('Cannot read image, check cv2.imread() documentation')
             return None
-    else:
-        print('Invalid format of image')
-        return None
 
     h, w = template.shape
     found_dec = (0, 0, 0)
@@ -188,9 +182,6 @@ def keypoint_locate_one(screenshot, template, accuracy=0.95):
         if template is None:
             print('Cannot read image, check cv2.imread() documentation')
             return None
-    else:
-        print('Invalid format of image')
-        return None
 
     w, h = template.shape[::-1]
 
@@ -987,20 +978,107 @@ def test_3():
         worksheet.write(2, col+1, np.mean(alg))
 
     workbook.close()
+
+def test_4():
+    test_data = prepare_test_data_4('real_test_screenshots', 'real_test_templates')
+
+    # test_data = 
+        # control_1
+        # [
+            # (screenshot, template, pos, dist)
+            # (screenshot, template, pos, dist)
+            # ......................
+            # (screenshot, template, pos, dist)
+        # ]
+        # control_2
+        # .........
+        # control_5
+
+    accuracy_results = [
+        # my_locate_one
+        [],
+
+        # scale_locate_one
+        [],
+
+        # keypoint_locate_one
+        []
+    ]
+
+    time_results = [
+        # my_locate_one
+        [],
+
+        # scale_locate_one
+        [],
+
+        # keypoint_locate_one
+        []
+    ]
+
+
+    i = -1
+    for alg in (my_locate_one, scale_locate_one, keypoint_locate_one):
+        i += 1
+        print(f'Stage: {i}')
+        j=-1
+        for control in test_data:
+            j+=1
+            for data in control:
+                test_screenshot = data[0].copy()
+                test_template = data[1].copy()
+                point_res, time = alg(test_screenshot, test_template)
+                time_results[i][j].append(time)
+
+                accuracy = 1
+                if point_res[0] < 0 or point_res[1] < 0:
+                    accuracy = 0
+                else:
+                    accuracy = 1 - math.dist(data[2], point_res) / data[3]
+                if accuracy < 0:
+                    accuracy = 0
+                accuracy_results[i][j].append(accuracy)
+
+    import xlsxwriter
+
+    workbook = xlsxwriter.Workbook('results_of_test_4.xlsx')
+    worksheet = workbook.add_worksheet()
+
+    worksheet.write(0, 1, 'CONTROL 1')
+    worksheet.write(0, 5, 'CONTROL 2')
+    worksheet.write(0, 9, 'CONTROL 3')
+    worksheet.write(0, 13, 'CONTROL 4')
+    worksheet.write(0, 17, 'CONTROL 5')
+
+
+    for alg_col, alg in enumerate(accuracy_results):
+        for control_col, control in enumerate(alg):
+            for res_row, res in enumerate(control):
+                worksheet.write(1+res_row*3, control_col*4+alg_col, res)
+
+    for alg_col, alg in enumerate(time_results):
+        for control_col, control in enumerate(alg):
+            for res_row, res in enumerate(control):
+                worksheet.write(2+res_row*3, control_col*4+alg_col, res)
+
+    workbook.close()
     
 
 def main():
     #print('---------------------------TEST 0---------------------------')
     #test_0() 
 
-    print('---------------------------TEST 1---------------------------')
-    test_1()
+    #print('---------------------------TEST 1---------------------------')
+    #test_1()
 
-    print('---------------------------TEST 2---------------------------')
-    test_2()
+    #print('---------------------------TEST 2---------------------------')
+    #test_2()
 
-    print('---------------------------TEST 3---------------------------')
-    test_3()
+    #print('---------------------------TEST 3---------------------------')
+    #test_3()
+
+    print('---------------------------TEST 4---------------------------')
+    test_4()
 
 
 if __name__ == "__main__":

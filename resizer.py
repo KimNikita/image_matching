@@ -3,6 +3,7 @@ import numpy as np
 import os
 import imutils
 import random
+import glob
 from PIL import ImageGrab
 
 # percentage distribution
@@ -328,6 +329,62 @@ def prepare_test_data_3(template):
         
     return test_data
 
+def prepare_test_data_4(screenshots_path, templates_path):
+    #test_data = prepare_test_data_4('real_test_screenshots', 'real_test_templates')
+    # test_data = 
+        # control_1
+        # [
+            # (screenshot, template, pos, dist)
+            # (screenshot, template, pos, dist)
+            # ......................
+            # (screenshot, template, pos, dist)
+        # ]
+        # control_2
+        # .........
+        # control_5
+    test_data = [
+        [],
+        [],
+        [],
+        [],
+        []
+    ]
+
+    # from .txt
+    positions = [
+        [
+
+        ],
+
+        [
+
+        ],
+
+        [
+
+        ],
+
+        [
+
+        ],
+
+        [
+
+        ]
+    ]
+
+    for i in range(5):
+        for template in glob.glob(os.path.join(templates_path, str(i+1), '*.png')):
+            template_data = cv.imread(template, cv.IMREAD_GRAYSCALE)
+            h, w = template_data.shape
+            j=-1
+            for screenshot in glob.glob(os.path.join(screenshots_path, str(i+1), '*.png')):
+                j+=1
+                screenshot_data = cv.imread(screenshot, cv.IMREAD_GRAYSCALE)
+                test_data[i].append([screenshot_data, template_data, positions[i][j], min(w//2, h//2)])
+
+    return test_data
+
 
 def prepare_resized_data(template, inc_path, dec_path, inc_dec_path, proportional_path):
     template = cv.imread(template, cv.IMREAD_GRAYSCALE)
@@ -351,7 +408,6 @@ def prepare_resized_data(template, inc_path, dec_path, inc_dec_path, proportiona
 
 def main():
     prepare_resized_data('template.png', 'test_data\increase', 'test_data\decrease', 'test_data\incdec', 'test_data\proportional')
-
 
 if __name__ == "__main__":
     main()
