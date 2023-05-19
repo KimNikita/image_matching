@@ -561,10 +561,10 @@ def keypoint_locate_all(screenshot, template, count, accuracy=0.95):
 def main():
     # by_image(None, 'template.png', second_try=True)
     # result = locate_all('template.png', 5, second_try=True)
-    # result = locate_one('template.png', second_try=True)
+    result = locate_one('2_1024_768.png', second_try=True)
     # result = scale_locate_one('template.png')
     # result = keypoint_locate_one('template.png')
-    result = keypoint_locate_all('test2.png','template.PNG', 5)
+    # result = keypoint_locate_all('test2.png','template.PNG', 5)
     print(result)
 
 

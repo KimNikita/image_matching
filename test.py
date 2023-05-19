@@ -2,7 +2,7 @@
 import cv2 as cv
 import numpy as np
 from PIL import ImageGrab
-from resizer import prepare_test_data_0, prepare_test_data_1, prepare_test_data_2, prepare_test_data_3
+from resizer import prepare_test_data_0, prepare_test_data_1, prepare_test_data_2, prepare_test_data_3, prepare_test_data_4
 import math
 import timeit
 import operator
@@ -996,24 +996,24 @@ def test_4():
 
     accuracy_results = [
         # my_locate_one
-        [],
+        [[],[],[],[],[]],
 
         # scale_locate_one
-        [],
+        [[],[],[],[],[]],
 
         # keypoint_locate_one
-        []
+        [[],[],[],[],[]]
     ]
 
     time_results = [
         # my_locate_one
-        [],
+        [[],[],[],[],[]],
 
         # scale_locate_one
-        [],
+        [[],[],[],[],[]],
 
         # keypoint_locate_one
-        []
+        [[],[],[],[],[]]
     ]
 
 
@@ -1031,6 +1031,7 @@ def test_4():
                 time_results[i][j].append(time)
 
                 accuracy = 1
+                #print(data[2], point_res)
                 if point_res[0] < 0 or point_res[1] < 0:
                     accuracy = 0
                 else:
