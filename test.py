@@ -246,6 +246,82 @@ def keypoint_locate_one(screenshot, template, accuracy=0.95):
 
     return (x, y)
 
+# ADVANCED TEMPLATE MATCHING
+
+@timing
+def advanced_locate_one(screenshot, template, accuracy=0.95, second_try=True):
+    if isinstance(template, str):
+        template = cv.imread(template, cv.IMREAD_GRAYSCALE)
+        if template is None:
+            print('Cannot read image, check cv2.imread() documentation')
+            return None
+
+    h, w = template.shape
+    x, y = -1, -1
+
+    # decrease
+    found_dec = (0, 0, 0, 0)
+    for scale in np.linspace(0.2, 1.0, 20)[::-1]:
+        resized = imutils.resize(screenshot, width=int(screenshot.shape[1] * scale))
+        r = screenshot.shape[1] / float(resized.shape[1])
+
+        if resized.shape[0] < h or resized.shape[1] < w:
+            break
+
+        result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
+        (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
+
+        if maxVal > found_dec[0]:
+            found_dec = (maxVal, maxLoc, r, result)
+        else:
+            break
+    # increase
+    found_inc = (0, 0, 0, 0)
+    for scale in np.linspace(0.2, 1.0, 20):
+        resized = imutils.resize(screenshot, width=int(screenshot.shape[1] * (1+scale)))
+        r = screenshot.shape[1] / float(resized.shape[1])
+
+        result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
+        (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
+
+        if maxVal > found_inc[0]:
+            found_inc = (maxVal, maxLoc, r, result)
+        else:
+            break
+
+    if found_dec[0] > found_inc[0]:
+        (maxVal, maxLoc, r, res) = found_dec
+    else:
+        (maxVal, maxLoc, r, res) = found_inc
+
+    if maxVal >= accuracy:
+       x, y = int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2
+    elif second_try and maxLoc[1]-1>=0 and maxLoc[0]-1>=0 and maxLoc[1]+1<res.shape[0] and maxLoc[0]+1<res.shape[1]:
+        # коэффициент 0.02 получен экспериментально
+        similarity = accuracy * 0.02
+        val00 = res[maxLoc[1]-1][maxLoc[0]-1]
+        val10 = res[maxLoc[1]][maxLoc[0]-1]
+        val20 = res[maxLoc[1]+1][maxLoc[0]-1]
+        val01 = res[maxLoc[1]-1][maxLoc[0]]
+        val21 = res[maxLoc[1]+1][maxLoc[0]]
+        val02 = res[maxLoc[1]-1][maxLoc[0]+1]
+        val12 = res[maxLoc[1]][maxLoc[0]+1]
+        val22 = res[maxLoc[1]+1][maxLoc[0]+1]
+        # Make sure that vertical and horizontal values way bigger than in the corners
+        valid_score = 0
+        if val10 - (val00+val20)/2 >= similarity:
+            valid_score += 1
+        if val01 - (val00+val02)/2 >= similarity:
+            valid_score += 1
+        if val21 - (val20+val22)/2 >= similarity:
+            valid_score += 1
+        if val12 - (val02+val22)/2 >= similarity:
+            valid_score += 1
+        if valid_score >= 2:
+           x, y = int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2
+
+    return (x, y)
+
 
 # ------------------- LOCATE All ------------------------
 
@@ -979,6 +1055,7 @@ def test_3():
 
     workbook.close()
 
+# real data
 def test_4():
     test_data = prepare_test_data_4('real_test_screenshots', 'real_test_templates')
 
@@ -1063,6 +1140,91 @@ def test_4():
                 worksheet.write(2+res_row*3, control_col*4+alg_col, res)
 
     workbook.close()
+
+# real data
+def test_5():
+    test_data = prepare_test_data_4('real_test_screenshots', 'real_test_templates')
+
+    # test_data = 
+        # control_1
+        # [
+            # (screenshot, template, pos, dist)
+            # (screenshot, template, pos, dist)
+            # ......................
+            # (screenshot, template, pos, dist)
+        # ]
+        # control_2
+        # .........
+        # control_5
+
+    accuracy_results = [
+        # my_locate_one
+        [[],[],[],[],[]],
+
+        # scale_locate_one
+        [[],[],[],[],[]],
+
+        # advanced_locate_one
+        [[],[],[],[],[]]
+    ]
+
+    time_results = [
+        # my_locate_one
+        [[],[],[],[],[]],
+
+        # scale_locate_one
+        [[],[],[],[],[]],
+
+        # advanced_locate_one
+        [[],[],[],[],[]]
+    ]
+
+
+    i = -1
+    for alg in (my_locate_one, scale_locate_one, advanced_locate_one):
+        i += 1
+        print(f'Stage: {i}')
+        j=-1
+        for control in test_data:
+            j+=1
+            for data in control:
+                test_screenshot = data[0].copy()
+                test_template = data[1].copy()
+                point_res, time = alg(test_screenshot, test_template)
+                time_results[i][j].append(time)
+
+                accuracy = 1
+                if point_res[0] < 0 or point_res[1] < 0:
+                    accuracy = 0
+                else:
+                    accuracy = 1 - math.dist(data[2], point_res) / data[3]
+                if accuracy < 0:
+                    accuracy = 0
+                accuracy_results[i][j].append(accuracy)
+
+    import xlsxwriter
+
+    workbook = xlsxwriter.Workbook('results_of_test_5.xlsx')
+    worksheet = workbook.add_worksheet()
+
+    worksheet.write(0, 1, 'CONTROL 1')
+    worksheet.write(0, 5, 'CONTROL 2')
+    worksheet.write(0, 9, 'CONTROL 3')
+    worksheet.write(0, 13, 'CONTROL 4')
+    worksheet.write(0, 17, 'CONTROL 5')
+
+
+    for alg_col, alg in enumerate(accuracy_results):
+        for control_col, control in enumerate(alg):
+            for res_row, res in enumerate(control):
+                worksheet.write(1+res_row*3, control_col*4+alg_col, res)
+
+    for alg_col, alg in enumerate(time_results):
+        for control_col, control in enumerate(alg):
+            for res_row, res in enumerate(control):
+                worksheet.write(2+res_row*3, control_col*4+alg_col, res)
+
+    workbook.close()
     
 
 def main():
@@ -1078,8 +1240,11 @@ def main():
     #print('---------------------------TEST 3---------------------------')
     #test_3()
 
-    print('---------------------------TEST 4---------------------------')
-    test_4()
+    #print('---------------------------TEST 4---------------------------')
+    #test_4()
+
+    print('---------------------------TEST 5---------------------------')
+    test_5()
 
 
 if __name__ == "__main__":
