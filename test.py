@@ -140,7 +140,7 @@ def scale_locate_one(screenshot, template, accuracy=0.95):
 
     # increase
     found_inc = (0, 0, 0)
-    for scale in np.linspace(0.2, 1.0, 20):
+    for scale in np.linspace(0.04, 0.8, 19):
         resized = imutils.resize(
             screenshot, width=int(screenshot.shape[1] * (1+scale)))
         r = screenshot.shape[1] / float(resized.shape[1])
@@ -433,7 +433,7 @@ def scale_locate_all(screenshot, template, accuracy=0.95):
 
         # increase
         found_inc = (0, 0, 0)
-        for scale in np.linspace(0.2, 1.0, 20):
+        for scale in np.linspace(0.04, 0.8, 19):
             resized = imutils.resize(
                 screenshot, width=int(screenshot.shape[1] * (1+scale)))
             r = screenshot.shape[1] / float(resized.shape[1])
