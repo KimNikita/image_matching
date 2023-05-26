@@ -329,8 +329,8 @@ def prepare_test_data_3(template):
         
     return test_data
 
-def prepare_test_data_4(screenshots_path, templates_path):
-    #test_data = prepare_test_data_4('real_test_screenshots', 'real_test_templates')
+# real data
+def prepare_test_data_4_5(screenshots_path, templates_path):
     # test_data = 
         # control_1
         # [
@@ -385,6 +385,151 @@ def prepare_test_data_4(screenshots_path, templates_path):
 
     return test_data
 
+# test_1 + test_2 + test_3 auto
+def prepare_test_data_6(screenshots_path, templates_path):
+    # test_data = 
+        # test_1
+        # [
+            # (screenshot, template, pos, dist)
+            # (screenshot, template, pos, dist)
+            # ......................
+            # (screenshot, template, pos, dist)
+        # ]
+        # test_2
+        # [
+            # (screenshot, template, pos=[p1, p2, p3, p4, p5], dist=[d1, d2, d3, d4, d5])
+            # (screenshot, template, pos=[p1, p2, p3, p4, p5], dist=[d1, d2, d3, d4, d5])
+            # ......................
+            # (screenshot, template, pos=[p1, p2, p3, p4, p5], dist=[d1, d2, d3, d4, d5])
+        # ]
+        # test_3
+        # [
+            # (screenshot, template)
+            # (screenshot, template)
+            # ......................
+            # (screenshot, template)
+        # ]
+    test_data = [
+        [],
+        [],
+        []
+    ]
+
+    scales = []
+    proportional_scales = []
+
+    for percent in np.linspace(0.05, 0.5, 10):
+        scales.append((int(w*(1+percent)), h))
+        scales.append((w, int(h*(1+percent))))
+        scales.append((int(w*(1+percent)), int(h*(1+percent))))
+        scales.append((int(w*(1-percent)), h))
+        scales.append((w, int(h*(1-percent))))
+        scales.append((int(w*(1-percent)), int(h*(1-percent))))
+        scales.append((int(w*(1+percent)), int(h*(1-percent))))
+        scales.append((int(w*(1-percent)), int(h*(1+percent))))
+        proportional_scales.append(int(w*(1+percent)))
+        proportional_scales.append(int(w*(1-percent)))
+
+    random.shuffle(scales)
+    random.shuffle(proportional_scales)
+
+    # test_1 auto
+    for template in glob.glob(os.path.join(templates_path, str(i+1), '*.png')):
+        template_data = cv.imread(template, cv.IMREAD_GRAYSCALE)
+        h, w = template_data.shape
+
+        screenshot_data = cv.imread(os.path.join(screenshots_path, str(i+1) + '.png'), cv.IMREAD_GRAYSCALE)
+        s_h, s_w = screenshot_data.shape
+        screenshot_data = screenshot_data[int(s_h//2-1.5*h): int(s_h//2+1.5*h), int(s_w//2-1.5*w): int(s_w//2+1.5*w)]
+        s_h, s_w = screenshot.shape
+
+        for scale in range(len(scales)//2):
+            resized = cv.resize(template_data, scales[scale])
+            r_h, r_w = resized.shape
+            data = screenshot_data.copy()
+            pos = (s_w//2, s_h//2)
+            x_offset = s_w//2 - r_w//2
+            y_offset = s_h//2 - r_h//2
+            data[y_offset:y_offset+r_h, x_offset:x_offset+r_w] = resized
+            test_data[0].append([data, template_data, pos, min(r_w//2, r_h//2)])
+        for scale in range(len(proportional_scales)//2): 
+            resized = imutils.resize(template_data, width=proportional_scales[scale])
+            r_h, r_w = resized.shape
+            
+            data = screenshot_data.copy()
+            pos = (s_w//2, s_h//2)
+            x_offset = s_w//2 - r_w//2
+            y_offset = s_h//2 - r_h//2
+            data[y_offset:y_offset+r_h, x_offset:x_offset+r_w] = resized
+                
+            test_data[0].append([data, template_data, pos, min(r_w//2, r_h//2)])
+    
+    # test_2 auto
+    for template in glob.glob(os.path.join(templates_path, str(i+1), '*.png')):
+        template_data = cv.imread(template, cv.IMREAD_GRAYSCALE)
+        h, w = template_data.shape
+
+        screenshot_data = cv.imread(os.path.join(screenshots_path, str(i+1) + '.png'), cv.IMREAD_GRAYSCALE)
+        s_h, s_w = screenshot_data.shape
+        screenshot_data = screenshot_data[max(0,int(s_h//2-3*h)): min(s_h,int(s_h//2+4*h)), max(0,int(s_w//2-4*w)): min(s_w,int(s_w//2+4*w))]
+        s_h, s_w = screenshot.shape
+
+        for scale in range(0, len(scales)//2-4, 5):
+            resized_all=[]
+            dists=[]
+            shapes=[]
+            for i in range(5):
+                resized = cv.resize(template_data, scales[scale+i])
+                r_h, r_w = resized.shape
+                shapes.append((r_w, r_h))
+                dists.append(min(r_w//2, r_h//2))
+                resized_all.append(resized)
+            data = screenshot_data.copy()
+            pos = [(s_w//2-2*w, s_h//2-h*3//2), (s_w//2, s_h//2-h*3//2), (s_w//2+2*w, s_h//2-h*3//2), (s_w//2-w, s_h//2+h*3//2), (s_w//2+w, s_h//2+h*3//2)]
+            
+            for i in range(5):
+                x_offset = pos[i][0] - shapes[i][0]//2
+                y_offset = pos[i][1] - shapes[i][1]//2
+                data[y_offset:y_offset+shapes[i][1], x_offset:x_offset+shapes[i][0]] = resized_all[i]
+            test_data[1].append([data, template_data, pos, dists])
+    
+    # test_3 auto
+    for template in glob.glob(os.path.join(templates_path, str(i+1), '*.png')):
+        template_data = cv.imread(template, cv.IMREAD_GRAYSCALE)
+        h, w = template_data.shape
+
+        screenshot_data = cv.imread(os.path.join(screenshots_path, str(i+1) + '.png'), cv.IMREAD_GRAYSCALE)
+        s_h, s_w = screenshot_data.shape
+        for scale in range(len(scales)//2):
+            resized = cv.resize(template_data, scales[scale])
+            r_h, r_w = resized.shape
+            data = screenshot_data.copy()
+            pos = [ (s_w//2-r_w, s_h//2-r_h), (s_w//2, s_h//2-r_h), (s_w//2+r_w, s_h//2-r_h), 
+                    (s_w//2-r_w, s_h//2),                           (s_w//2+r_w, s_h//2),
+                    (s_w//2-r_w, s_h//2+r_h), (s_w//2, s_h//2+r_h), (s_w//2+r_w, s_h//2+r_h)]
+            for i in range(8):
+                x_offset = pos[i][0] - r_w//2
+                y_offset = pos[i][1] - r_h//2
+                data[y_offset:y_offset+r_h, x_offset:x_offset+r_w] = resized
+            actual_data = data[s_h//2-r_h*5//4:s_h//2+r_h*5//4, s_w//2-r_w*5//4:s_w//2+r_w*5//4]
+            test_data[2].append([actual_data, template_data])
+        for scale in range(len(proportional_scales)//2): 
+            resized = imutils.resize(template_data, width=proportional_scales[scale])
+            r_h, r_w = resized.shape
+            
+            data = screenshot_data.copy()
+            pos = [ (s_w//2-r_w, s_h//2-r_h), (s_w//2, s_h//2-r_h), (s_w//2+r_w, s_h//2-r_h), 
+                    (s_w//2-r_w, s_h//2),                           (s_w//2+r_w, s_h//2),
+                    (s_w//2-r_w, s_h//2+r_h), (s_w//2, s_h//2+r_h), (s_w//2+r_w, s_h//2+r_h)]
+            for i in range(8):
+                x_offset = pos[i][0] - r_w//2
+                y_offset = pos[i][1] - r_h//2
+                data[y_offset:y_offset+r_h, x_offset:x_offset+r_w] = resized
+                
+            actual_data = data[s_h//2-r_h*5//4:s_h//2+r_h*5//4, s_w//2-r_w*5//4:s_w//2+r_w*5//4]
+            test_data[2].append([actual_data, template_data])
+
+    return test_data
 
 def prepare_resized_data(template, inc_path, dec_path, inc_dec_path, proportional_path):
     template = cv.imread(template, cv.IMREAD_GRAYSCALE)
