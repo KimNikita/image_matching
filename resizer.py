@@ -415,33 +415,33 @@ def prepare_test_data_6(screenshots_path, templates_path):
         []
     ]
 
-    scales = []
-    proportional_scales = []
-
-    for percent in np.linspace(0.05, 0.5, 10):
-        scales.append((int(w*(1+percent)), h))
-        scales.append((w, int(h*(1+percent))))
-        scales.append((int(w*(1+percent)), int(h*(1+percent))))
-        scales.append((int(w*(1-percent)), h))
-        scales.append((w, int(h*(1-percent))))
-        scales.append((int(w*(1-percent)), int(h*(1-percent))))
-        scales.append((int(w*(1+percent)), int(h*(1-percent))))
-        scales.append((int(w*(1-percent)), int(h*(1+percent))))
-        proportional_scales.append(int(w*(1+percent)))
-        proportional_scales.append(int(w*(1-percent)))
-
-    random.shuffle(scales)
-    random.shuffle(proportional_scales)
-
     # test_1 auto
-    for template in glob.glob(os.path.join(templates_path, str(i+1), '*.png')):
+    i=0
+    for template in glob.glob(os.path.join(templates_path, '*.png')):
+        i+=1
         template_data = cv.imread(template, cv.IMREAD_GRAYSCALE)
         h, w = template_data.shape
+        scales = []
+        proportional_scales = []
 
-        screenshot_data = cv.imread(os.path.join(screenshots_path, str(i+1) + '.png'), cv.IMREAD_GRAYSCALE)
+        for percent in np.linspace(0.05, 0.5, 10):
+            scales.append((int(w*(1+percent)), h))
+            scales.append((w, int(h*(1+percent))))
+            scales.append((int(w*(1+percent)), int(h*(1+percent))))
+            scales.append((int(w*(1-percent)), h))
+            scales.append((w, int(h*(1-percent))))
+            scales.append((int(w*(1-percent)), int(h*(1-percent))))
+            scales.append((int(w*(1+percent)), int(h*(1-percent))))
+            scales.append((int(w*(1-percent)), int(h*(1+percent))))
+            proportional_scales.append(int(w*(1+percent)))
+            proportional_scales.append(int(w*(1-percent)))
+        random.shuffle(scales)
+        random.shuffle(proportional_scales)
+
+        screenshot_data = cv.imread(os.path.join(screenshots_path, str(i) + '.png'), cv.IMREAD_GRAYSCALE)
         s_h, s_w = screenshot_data.shape
         screenshot_data = screenshot_data[int(s_h//2-1.5*h): int(s_h//2+1.5*h), int(s_w//2-1.5*w): int(s_w//2+1.5*w)]
-        s_h, s_w = screenshot.shape
+        s_h, s_w = screenshot_data.shape
 
         for scale in range(len(scales)//2):
             resized = cv.resize(template_data, scales[scale])
@@ -463,16 +463,34 @@ def prepare_test_data_6(screenshots_path, templates_path):
             data[y_offset:y_offset+r_h, x_offset:x_offset+r_w] = resized
                 
             test_data[0].append([data, template_data, pos, min(r_w//2, r_h//2)])
-    
+
     # test_2 auto
-    for template in glob.glob(os.path.join(templates_path, str(i+1), '*.png')):
+    i=0
+    for template in glob.glob(os.path.join(templates_path, '*.png')):
+        i+=1
         template_data = cv.imread(template, cv.IMREAD_GRAYSCALE)
         h, w = template_data.shape
+        scales = []
+        proportional_scales = []
 
-        screenshot_data = cv.imread(os.path.join(screenshots_path, str(i+1) + '.png'), cv.IMREAD_GRAYSCALE)
+        for percent in np.linspace(0.05, 0.5, 10):
+            scales.append((int(w*(1+percent)), h))
+            scales.append((w, int(h*(1+percent))))
+            scales.append((int(w*(1+percent)), int(h*(1+percent))))
+            scales.append((int(w*(1-percent)), h))
+            scales.append((w, int(h*(1-percent))))
+            scales.append((int(w*(1-percent)), int(h*(1-percent))))
+            scales.append((int(w*(1+percent)), int(h*(1-percent))))
+            scales.append((int(w*(1-percent)), int(h*(1+percent))))
+            proportional_scales.append(int(w*(1+percent)))
+            proportional_scales.append(int(w*(1-percent)))
+        random.shuffle(scales)
+        random.shuffle(proportional_scales)
+
+        screenshot_data = cv.imread(os.path.join(screenshots_path, str(i) + '.png'), cv.IMREAD_GRAYSCALE)
         s_h, s_w = screenshot_data.shape
         screenshot_data = screenshot_data[max(0,int(s_h//2-3*h)): min(s_h,int(s_h//2+4*h)), max(0,int(s_w//2-4*w)): min(s_w,int(s_w//2+4*w))]
-        s_h, s_w = screenshot.shape
+        s_h, s_w = screenshot_data.shape
 
         for scale in range(0, len(scales)//2-4, 5):
             resized_all=[]
@@ -492,14 +510,33 @@ def prepare_test_data_6(screenshots_path, templates_path):
                 y_offset = pos[i][1] - shapes[i][1]//2
                 data[y_offset:y_offset+shapes[i][1], x_offset:x_offset+shapes[i][0]] = resized_all[i]
             test_data[1].append([data, template_data, pos, dists])
-    
+
     # test_3 auto
-    for template in glob.glob(os.path.join(templates_path, str(i+1), '*.png')):
+    i=0
+    for template in glob.glob(os.path.join(templates_path, '*.png')):
+        i+=1
         template_data = cv.imread(template, cv.IMREAD_GRAYSCALE)
         h, w = template_data.shape
+        scales = []
+        proportional_scales = []
 
-        screenshot_data = cv.imread(os.path.join(screenshots_path, str(i+1) + '.png'), cv.IMREAD_GRAYSCALE)
+        for percent in np.linspace(0.05, 0.5, 10):
+            scales.append((int(w*(1+percent)), h))
+            scales.append((w, int(h*(1+percent))))
+            scales.append((int(w*(1+percent)), int(h*(1+percent))))
+            scales.append((int(w*(1-percent)), h))
+            scales.append((w, int(h*(1-percent))))
+            scales.append((int(w*(1-percent)), int(h*(1-percent))))
+            scales.append((int(w*(1+percent)), int(h*(1-percent))))
+            scales.append((int(w*(1-percent)), int(h*(1+percent))))
+            proportional_scales.append(int(w*(1+percent)))
+            proportional_scales.append(int(w*(1-percent)))
+        random.shuffle(scales)
+        random.shuffle(proportional_scales)
+
+        screenshot_data = cv.imread(os.path.join(screenshots_path, str(i) + '.png'), cv.IMREAD_GRAYSCALE)
         s_h, s_w = screenshot_data.shape
+
         for scale in range(len(scales)//2):
             resized = cv.resize(template_data, scales[scale])
             r_h, r_w = resized.shape

@@ -165,7 +165,7 @@ def scale_locate_one(screenshot, template, accuracy=0.95):
     if next_min[i]==0:
         next_min[i]=prev_max[i]
     # коэффициент 0.01 получен экспериментально
-    if maxVal - (prev_max[i]+next_min[i])/2 < 0.01 * accuracy:
+    if maxLoc == 0 or maxVal - (prev_max[i]+next_min[i])/2 < 0.01 * accuracy:
         return (-1, -1)
 
     x, y = int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2
@@ -332,9 +332,6 @@ def my_locate_all(screenshot, template, accuracy=0.95, second_try=True):
         if template is None:
             print('Cannot read image, check cv2.imread() documentation')
             return None
-    else:
-        print('Invalid format of image')
-        return None
 
     points=[]
     height, width = screenshot.shape
@@ -351,7 +348,7 @@ def my_locate_all(screenshot, template, accuracy=0.95, second_try=True):
         if max_value >= accuracy:
             x = max_location[0] + w//2
             y = max_location[1] + h//2
-        elif second_try:
+        elif second_try and max_location[1]-1>=0 and max_location[0]-1>=0 and max_location[1]+1<res.shape[0] and max_location[0]+1<res.shape[1]:
             # коэффициент 0.02 получен экспериментально
             similarity = accuracy * 0.02
 
@@ -401,9 +398,6 @@ def scale_locate_all(screenshot, template, accuracy=0.95):
         if template is None:
             print('Cannot read image, check cv2.imread() documentation')
             return None
-    else:
-        print('Invalid format of image')
-        return None
 
     h, w = template.shape
     points=[]
@@ -458,7 +452,7 @@ def scale_locate_all(screenshot, template, accuracy=0.95):
         if next_min[i]==0:
             next_min[i]=prev_max[i]
         # коэффициент 0.01 получен экспериментально
-        if maxVal - (prev_max[i]+next_min[i])/2 < 0.01 * accuracy:
+        if maxLoc == 0 or maxVal - (prev_max[i]+next_min[i])/2 < 0.01 * accuracy:
             points.append((-1, -1))
             continue
 
@@ -482,9 +476,6 @@ def keypoint_locate_all(screenshot, template, accuracy=0.95):
         if template is None:
             print('Cannot read image, check cv2.imread() documentation')
             return None
-    else:
-        print('Invalid format of image')
-        return None
 
     w, h = template.shape[::-1]
 
@@ -619,7 +610,7 @@ def advanced_locate_all(screenshot, template, accuracy=0.95, second_try=True):
             if valid_score >= 2:
                 points.append((int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2))
         else:
-            points.append(-1,-1)
+            points.append((-1,-1))
             continue
 
         for i in range(0, h):
@@ -1315,7 +1306,7 @@ def test_5():
 # real data
 def test_6():
     test_data = prepare_test_data_6('test_screenshots', 'test_templates')
-
+    #print(test_data)
     # test_data = 
         # test_1
         # [
@@ -1490,8 +1481,11 @@ def main():
     #print('---------------------------TEST 4---------------------------')
     #test_4()
 
-    print('---------------------------TEST 5---------------------------')
-    test_5()
+    #print('---------------------------TEST 5---------------------------')
+    #test_5()
+
+    print('---------------------------TEST 6---------------------------')
+    test_6()
 
 
 if __name__ == "__main__":
