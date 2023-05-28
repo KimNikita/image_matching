@@ -277,7 +277,7 @@ def advanced_locate_one(screenshot, template, accuracy=0.95, second_try=True):
             break
     # increase
     found_inc = (0, 0, 0, 0)
-    for scale in np.linspace(0.2, 1.0, 20):
+    for scale in np.linspace(0.04, 0.8, 19):
         resized = imutils.resize(screenshot, width=int(screenshot.shape[1] * (1+scale)))
         r = screenshot.shape[1] / float(resized.shape[1])
 
@@ -293,6 +293,9 @@ def advanced_locate_one(screenshot, template, accuracy=0.95, second_try=True):
         (maxVal, maxLoc, r, res) = found_dec
     else:
         (maxVal, maxLoc, r, res) = found_inc
+
+    if maxLoc == 0:
+        return (x, y)
 
     if maxVal >= accuracy:
        x, y = int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2
@@ -381,10 +384,10 @@ def my_locate_all(screenshot, template, accuracy=0.95, second_try=True):
         points.append((x, y))
 
         if x != -1 and y != -1:
-            for i in range(0, h):
+            for k in range(0, h):
                 for j in range(0, w):
-                    if 0 <= max_location[1]+i < height and 0 <= max_location[0]+j < width:
-                        screenshot[max_location[1]+i][max_location[0]+j] = 0
+                    if 0 <= max_location[1]+k < height and 0 <= max_location[0]+j < width:
+                        screenshot[max_location[1]+k][max_location[0]+j] = 0
 
     return points
 
@@ -460,9 +463,9 @@ def scale_locate_all(screenshot, template, accuracy=0.95):
         points.append((x, y))
 
         for i in range(0, h):
-            for j in range(0, w):
-                if 0 <= int(maxLoc[1] * r)+i < height and 0 <= int(maxLoc[0] * r)+j < width:
-                    screenshot[int(maxLoc[1] * r)+i][int(maxLoc[0] * r)+j] = 0
+            for k in range(0, w):
+                if 0 <= int(maxLoc[1] * r)+i < height and 0 <= int(maxLoc[0] * r)+k < width:
+                    screenshot[int(maxLoc[1] * r)+i][int(maxLoc[0] * r)+k] = 0
 
     return points
 
@@ -567,7 +570,7 @@ def advanced_locate_all(screenshot, template, accuracy=0.95, second_try=True):
                 break
         # increase
         found_inc = (0, 0, 0, 0)
-        for scale in np.linspace(0.2, 1.0, 20):
+        for scale in np.linspace(0.04, 0.8, 19):
             resized = imutils.resize(screenshot, width=int(screenshot.shape[1] * (1+scale)))
             r = screenshot.shape[1] / float(resized.shape[1])
 
@@ -583,6 +586,9 @@ def advanced_locate_all(screenshot, template, accuracy=0.95, second_try=True):
             (maxVal, maxLoc, r, res) = found_dec
         else:
             (maxVal, maxLoc, r, res) = found_inc
+        if maxLoc == 0:
+            points.append((-1, -1))
+            continue
 
         if maxVal >= accuracy:
             points.append((int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2))
@@ -610,13 +616,13 @@ def advanced_locate_all(screenshot, template, accuracy=0.95, second_try=True):
             if valid_score >= 2:
                 points.append((int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2))
         else:
-            points.append((-1,-1))
+            points.append((-1, -1))
             continue
 
         for i in range(0, h):
-            for j in range(0, w):
-                if 0 <= int(maxLoc[1] * r)+i < height and 0 <= int(maxLoc[0] * r)+j < width:
-                    screenshot[int(maxLoc[1] * r)+i][int(maxLoc[0] * r)+j] = 0
+            for k in range(0, w):
+                if 0 <= int(maxLoc[1] * r)+i < height and 0 <= int(maxLoc[0] * r)+k < width:
+                    screenshot[int(maxLoc[1] * r)+i][int(maxLoc[0] * r)+k] = 0
 
     return points
 
@@ -1303,7 +1309,7 @@ def test_5():
 
     workbook.close()
     
-# real data
+# syntetic data
 def test_6():
     test_data = prepare_test_data_6('test_screenshots', 'test_templates')
     #print(test_data)
@@ -1481,11 +1487,11 @@ def main():
     #print('---------------------------TEST 4---------------------------')
     #test_4()
 
-    #print('---------------------------TEST 5---------------------------')
-    #test_5()
+    print('---------------------------TEST 5---------------------------')
+    test_5()
 
-    print('---------------------------TEST 6---------------------------')
-    test_6()
+    #print('---------------------------TEST 6---------------------------')
+    #test_6()
 
 
 if __name__ == "__main__":

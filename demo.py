@@ -1,7 +1,8 @@
 # TODO fix save path for screenshot
 
 #-------------------FINAL FUNCTIONS---------------------
-def by_image(self, template, accuracy=0.95, second_try=False):
+
+def by_image(self, template, accuracy=0.95, second_try=True):
     '''
     template - path to template image of control.\n
     accuracy - the percentage of pixels matching the template image and the one found on the screen. Default 0.95.\n
@@ -141,12 +142,185 @@ def by_image(self, template, accuracy=0.95, second_try=False):
     plt.show()
 
 def locate_one(template, accuracy=0.95, second_try=True):
-    # advanced locate one
-    return None
+    import cv2 as cv
+    import numpy as np
+    import imutils
 
-def locate_all(template, count=1, accuracy=0.95, second_try=True):
-    # advanced locate all
-    return None
+    if isinstance(template, str):
+        template = cv.imread(template, cv.IMREAD_GRAYSCALE)
+        if template is None:
+            print('Cannot read image, check cv2.imread() documentation')
+            return None
+    else:
+        print('Invalid format of image')
+        return None
+
+    from PIL import ImageGrab
+
+    screenshot = ImageGrab.grab(None)
+    screenshot.save('screen.png')
+    screenshot = cv.imread('screen.png', cv.IMREAD_GRAYSCALE)
+
+    h, w = template.shape
+    box = (-1, -1, -1, -1)
+
+    found_dec = (0, 0, 0, 0)
+    for scale in np.linspace(0.2, 1.0, 20)[::-1]:
+        resized = imutils.resize(screenshot, width=int(screenshot.shape[1] * scale))
+        r = screenshot.shape[1] / float(resized.shape[1])
+
+        if resized.shape[0] < h or resized.shape[1] < w:
+            break
+
+        result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
+        (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
+
+        if maxVal > found_dec[0]:
+            found_dec = (maxVal, maxLoc, r, result)
+        else:
+            break
+
+    found_inc = (0, 0, 0, 0)
+    for scale in np.linspace(0.04, 0.8, 19):
+        resized = imutils.resize(screenshot, width=int(screenshot.shape[1] * (1+scale)))
+        r = screenshot.shape[1] / float(resized.shape[1])
+
+        result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
+        (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
+
+        if maxVal > found_inc[0]:
+            found_inc = (maxVal, maxLoc, r, result)
+        else:
+            break
+
+    if found_dec[0] > found_inc[0]:
+        (maxVal, maxLoc, r, res) = found_dec
+    else:
+        (maxVal, maxLoc, r, res) = found_inc
+
+    if maxLoc == 0:
+        return box
+
+    if maxVal >= accuracy:
+       box = (int(maxLoc[0] * r), int(maxLoc[1] * r), int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2)
+    elif second_try and 0 < maxLoc[1] < res.shape[0]-1 and 0 < maxLoc[0] < res.shape[1]-1:
+        similarity = accuracy * 0.02
+        val00 = res[maxLoc[1]-1][maxLoc[0]-1]
+        val10 = res[maxLoc[1]][maxLoc[0]-1]
+        val20 = res[maxLoc[1]+1][maxLoc[0]-1]
+        val01 = res[maxLoc[1]-1][maxLoc[0]]
+        val21 = res[maxLoc[1]+1][maxLoc[0]]
+        val02 = res[maxLoc[1]-1][maxLoc[0]+1]
+        val12 = res[maxLoc[1]][maxLoc[0]+1]
+        val22 = res[maxLoc[1]+1][maxLoc[0]+1]
+
+        valid_score = 0
+        if val10 - (val00+val20)/2 >= similarity:
+            valid_score += 1
+        if val01 - (val00+val02)/2 >= similarity:
+            valid_score += 1
+        if val21 - (val20+val22)/2 >= similarity:
+            valid_score += 1
+        if val12 - (val02+val22)/2 >= similarity:
+            valid_score += 1
+        if valid_score >= 2:
+           box = (int(maxLoc[0] * r), int(maxLoc[1] * r), int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2)
+
+    return box
+
+def locate_all(template, count, accuracy=0.95, second_try=True):
+    import cv2 as cv
+    import numpy as np
+    import imutils
+
+    if isinstance(template, str):
+        template = cv.imread(template, cv.IMREAD_GRAYSCALE)
+        if template is None:
+            print('Cannot read image, check cv2.imread() documentation')
+            return None
+    else:
+        print('Invalid format of image')
+        return None
+
+    h, w = template.shape
+    height, width = screenshot.shape
+    boxes=[]
+
+    for j in range(count):
+        found_dec = (0, 0, 0, 0)
+        for scale in np.linspace(0.2, 1.0, 20)[::-1]:
+            resized = imutils.resize(screenshot, width=int(screenshot.shape[1] * scale))
+            r = screenshot.shape[1] / float(resized.shape[1])
+
+            if resized.shape[0] < h or resized.shape[1] < w:
+                break
+
+            result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
+            (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
+
+            if maxVal > found_dec[0]:
+                found_dec = (maxVal, maxLoc, r, result)
+            else:
+                break
+
+        found_inc = (0, 0, 0, 0)
+        for scale in np.linspace(0.04, 0.8, 19):
+            resized = imutils.resize(screenshot, width=int(screenshot.shape[1] * (1+scale)))
+            r = screenshot.shape[1] / float(resized.shape[1])
+
+            result = cv.matchTemplate(resized, template, cv.TM_CCOEFF_NORMED)
+            (_, maxVal, _, maxLoc) = cv.minMaxLoc(result)
+
+            if maxVal > found_inc[0]:
+                found_inc = (maxVal, maxLoc, r, result)
+            else:
+                break
+
+        if found_dec[0] > found_inc[0]:
+            (maxVal, maxLoc, r, res) = found_dec
+        else:
+            (maxVal, maxLoc, r, res) = found_inc
+        if maxLoc == 0:
+            for i in range(j, count):
+                boxes.append((-1, -1, -1, -1))
+            return boxes
+
+        if maxVal >= accuracy:
+            boxes.append(int(maxLoc[0] * r), int(maxLoc[1] * r), int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2)
+        elif second_try and maxLoc[1]-1>=0 and maxLoc[0]-1>=0 and maxLoc[1]+1<res.shape[0] and maxLoc[0]+1<res.shape[1]:
+            # коэффициент 0.02 получен экспериментально
+            similarity = accuracy * 0.02
+            val00 = res[maxLoc[1]-1][maxLoc[0]-1]
+            val10 = res[maxLoc[1]][maxLoc[0]-1]
+            val20 = res[maxLoc[1]+1][maxLoc[0]-1]
+            val01 = res[maxLoc[1]-1][maxLoc[0]]
+            val21 = res[maxLoc[1]+1][maxLoc[0]]
+            val02 = res[maxLoc[1]-1][maxLoc[0]+1]
+            val12 = res[maxLoc[1]][maxLoc[0]+1]
+            val22 = res[maxLoc[1]+1][maxLoc[0]+1]
+            # Make sure that vertical and horizontal values way bigger than in the corners
+            valid_score = 0
+            if val10 - (val00+val20)/2 >= similarity:
+                valid_score += 1
+            if val01 - (val00+val02)/2 >= similarity:
+                valid_score += 1
+            if val21 - (val20+val22)/2 >= similarity:
+                valid_score += 1
+            if val12 - (val02+val22)/2 >= similarity:
+                valid_score += 1
+            if valid_score >= 2:
+                boxes.append(int(maxLoc[0] * r), int(maxLoc[1] * r), int(maxLoc[0] * r) + w//2, int(maxLoc[1] * r) + h//2)
+        else:
+            for i in range(j, count):
+                boxes.append((-1, -1, -1, -1))
+            return boxes
+
+        for i in range(0, h):
+            for k in range(0, w):
+                if int(maxLoc[1] * r)+i < height and int(maxLoc[0] * r)+k < width:
+                    screenshot[int(maxLoc[1] * r)+i][int(maxLoc[0] * r)+k] = 0
+
+    return boxes
 
 
 #-------------------TEST FUNCTIONS----------------------
@@ -240,7 +414,6 @@ def my_locate_one(template, accuracy=0.95, second_try=False):
 
     return box
 
-# TODO if cannot find at some step -> stop and return
 def my_locate_all(template, count, accuracy=0.95, second_try=False):
     '''
     template - path to template image of control.\n
